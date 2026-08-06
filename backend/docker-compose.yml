@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: eco_trace_db
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: eco_trace
+      POSTGRES_PASSWORD: eco_trace_password
+      POSTGRES_DB: eco_trace
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

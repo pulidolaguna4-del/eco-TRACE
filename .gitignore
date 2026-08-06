@@ -4,8 +4,9 @@ frontend/dist/
 
 # Python
 backend/.venv/
-backend/__pycache__/
-backend/*.pyc
+**/__pycache__/
+**/*.pyc
+**/*.pyo
 
 # Variables de entorno
 .env
