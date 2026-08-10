@@ -8,6 +8,7 @@ import RecuperarPassword from './pages/RecuperarPassword'
 import Home from './pages/Home'
 import Mapa from './pages/Mapa'
 import Perfil from './pages/Perfil'
+import Admin from './pages/Admin'
 
 function AppContent() {
   const location = useLocation()
@@ -24,20 +25,52 @@ function AppContent() {
       {!ocultarNavbar && <Navbar />}
 
       <Routes>
-        <Route path="/" element={<Home />} />
 
-        <Route path="/login" element={<Login />} />
+        {/* HOME */}
+        <Route
+          path="/"
+          element={<Home />}
+        />
 
-        <Route path="/register" element={<Register />} />
+        <Route
+          path="/home"
+          element={<Home />}
+        />
+
+        {/* AUTENTICACIÓN */}
+        <Route
+          path="/login"
+          element={<Login />}
+        />
+
+        <Route
+          path="/register"
+          element={<Register />}
+        />
 
         <Route
           path="/recuperar-password"
           element={<RecuperarPassword />}
         />
 
-        <Route path="/mapa" element={<Mapa />} />
+        {/* MAPA */}
+        <Route
+          path="/mapa"
+          element={<Mapa />}
+        />
 
-        <Route path="/perfil" element={<Perfil />} />
+        {/* PERFIL */}
+        <Route
+          path="/perfil"
+          element={<Perfil />}
+        />
+
+        {/* ADMINISTRADOR */}
+        <Route
+          path="/admin"
+          element={<Admin />}
+        />
+
       </Routes>
     </>
   )
@@ -48,3 +81,4 @@ function App() {
 }
 
 export default App
+

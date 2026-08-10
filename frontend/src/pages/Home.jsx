@@ -8,8 +8,32 @@ function Home() {
   const [puntos, setPuntos] = useState([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
+  const [esAdmin, setEsAdmin] = useState(false)
 
   useEffect(() => {
+    // =====================================================
+    // COMPROBAR USUARIO
+    // =====================================================
+
+    const usuarioGuardado = localStorage.getItem('usuario')
+
+    if (usuarioGuardado) {
+      try {
+        const usuario = JSON.parse(usuarioGuardado)
+
+        setEsAdmin(usuario.es_admin === true)
+      } catch (error) {
+        console.error(
+          'Error leyendo usuario:',
+          error
+        )
+      }
+    }
+
+    // =====================================================
+    // CARGAR PUNTOS
+    // =====================================================
+
     const cargarPuntos = async () => {
       try {
         const respuesta = await fetch(
@@ -17,15 +41,22 @@ function Home() {
         )
 
         if (!respuesta.ok) {
-          throw new Error('No se pudieron cargar los puntos')
+          throw new Error(
+            'No se pudieron cargar los puntos'
+          )
         }
 
         const datos = await respuesta.json()
 
         setPuntos(datos)
+
       } catch (error) {
         console.error(error)
-        setError('No se pudieron cargar los puntos')
+
+        setError(
+          'No se pudieron cargar los puntos'
+        )
+
       } finally {
         setCargando(false)
       }
@@ -35,9 +66,12 @@ function Home() {
   }, [])
 
   return (
-    <main className="home-main">
+    <main className="home">
 
-      {/* Bienvenida */}
+      {/* =================================================
+          BIENVENIDA
+      ================================================= */}
+
       <section className="welcome-section">
 
         <h2>
@@ -52,10 +86,14 @@ function Home() {
       </section>
 
 
-      {/* Opciones principales */}
+      {/* =================================================
+          OPCIONES PRINCIPALES
+      ================================================= */}
+
       <section className="options-section">
 
         {/* MAPA */}
+
         <div className="option-card">
 
           <div className="option-icon">
@@ -82,6 +120,7 @@ function Home() {
 
 
         {/* AGREGAR PUNTO */}
+
         <div className="option-card">
 
           <div className="option-icon">
@@ -99,7 +138,9 @@ function Home() {
 
           <button
             className="primary-button"
-            onClick={() => navigate('/agregar-punto')}
+            onClick={() =>
+              navigate('/agregar-punto')
+            }
           >
             Agregar punto
           </button>
@@ -108,6 +149,7 @@ function Home() {
 
 
         {/* RECICLAJE */}
+
         <div className="option-card">
 
           <div className="option-icon">
@@ -125,17 +167,57 @@ function Home() {
 
           <button
             className="primary-button"
-            onClick={() => navigate('/mapa')}
+            onClick={() =>
+              navigate('/mapa')
+            }
           >
             Explorar
           </button>
 
         </div>
 
+
+        {/* =================================================
+            ADMINISTRADOR
+        ================================================= */}
+
+        {esAdmin && (
+
+          <div className="option-card admin-card">
+
+            <div className="option-icon">
+              🛡️
+            </div>
+
+            <h3>
+              Panel de administrador
+            </h3>
+
+            <p>
+              Administra usuarios y revisa los
+              puntos pendientes.
+            </p>
+
+            <button
+              className="primary-button"
+              onClick={() =>
+                navigate('/admin')
+              }
+            >
+              Ir al panel
+            </button>
+
+          </div>
+
+        )}
+
       </section>
 
 
-      {/* PUNTOS DISPONIBLES */}
+      {/* =================================================
+          PUNTOS DISPONIBLES
+      ================================================= */}
+
       <section className="points-section">
 
         <h2>
@@ -143,33 +225,43 @@ function Home() {
         </h2>
 
 
-        {/* Cargando */}
+        {/* CARGANDO */}
+
         {cargando && (
+
           <p className="points-message">
             Cargando puntos...
           </p>
+
         )}
 
 
-        {/* Error */}
+        {/* ERROR */}
+
         {error && (
+
           <p className="points-error">
             {error}
           </p>
+
         )}
 
 
-        {/* Sin puntos */}
+        {/* SIN PUNTOS */}
+
         {!cargando &&
           !error &&
           puntos.length === 0 && (
+
             <p className="points-message">
               No hay puntos disponibles todavía.
             </p>
+
           )}
 
 
-        {/* Lista de puntos */}
+        {/* LISTA DE PUNTOS */}
+
         {!cargando &&
           !error &&
           puntos.length > 0 && (
