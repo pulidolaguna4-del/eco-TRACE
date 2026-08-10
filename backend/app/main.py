@@ -4,20 +4,32 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlmodel import SQLModel, Session, select
 from pwdlib import PasswordHash
+
 import jwt
 import os
+import random
+import smtplib
+
+from datetime import datetime, timedelta, timezone
+from email.message import EmailMessage
 from dotenv import load_dotenv
 
 from app.database import engine
+
 from app.models import (
     Usuario,
     UsuarioRegistro,
     UsuarioRespuesta,
+    UsuarioActualizar,
     UsuarioLogin,
     TokenRespuesta,
     Punto,
     PuntoRegistro,
-    PuntoRespuesta
+    PuntoRespuesta,
+    CodigoRecuperacion,
+    SolicitarRecuperacion,
+    VerificarCodigo,
+    NuevaContrasena
 )
 
 
@@ -30,9 +42,33 @@ load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 
 if not SECRET_KEY:
-    raise ValueError("No se encontró SECRET_KEY en el archivo .env")
+    raise ValueError(
+        "No se encontró SECRET_KEY en el archivo .env"
+    )
+
+EMAIL_HOST = os.getenv(
+    "EMAIL_HOST",
+    "smtp.gmail.com"
+)
+
+EMAIL_PORT = int(
+    os.getenv(
+        "EMAIL_PORT",
+        "587"
+    )
+)
+
+EMAIL_USER = os.getenv("EMAIL_USER")
+
+EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+
+if not EMAIL_USER or not EMAIL_PASSWORD:
+    raise ValueError(
+        "No se configuró EMAIL_USER o EMAIL_PASSWORD en el archivo .env"
+    )
 
 ALGORITHM = "HS256"
+
 
 app = FastAPI(
     title="Eco-TRACE API"
@@ -93,11 +129,79 @@ def crear_tablas():
 
 
 # =========================================================
+# FUNCIÓN PARA ENVIAR CORREOS
+# =========================================================
+
+def enviar_correo_recuperacion(
+    correo_destino: str,
+    codigo: str
+):
+
+    mensaje = EmailMessage()
+
+    mensaje["Subject"] = "Código de recuperación - Eco-TRACE"
+    mensaje["From"] = EMAIL_USER
+    mensaje["To"] = correo_destino
+
+    mensaje.set_content(
+        f"""
+Hola,
+
+Recibimos una solicitud para recuperar la contraseña de tu cuenta de Eco-TRACE.
+
+Tu código de recuperación es:
+
+{codigo}
+
+Este código será válido durante 24 horas.
+
+Si tú no solicitaste recuperar tu contraseña, puedes ignorar este correo.
+
+Saludos,
+
+Equipo Eco-TRACE
+"""
+    )
+
+    try:
+
+        with smtplib.SMTP(
+            EMAIL_HOST,
+            EMAIL_PORT
+        ) as servidor:
+
+            servidor.starttls()
+
+            servidor.login(
+                EMAIL_USER,
+                EMAIL_PASSWORD
+            )
+
+            servidor.send_message(
+                mensaje
+            )
+
+    except Exception as error:
+
+        print(
+            "ERROR AL ENVIAR CORREO:",
+            error
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail="No se pudo enviar el correo de recuperación"
+        )
+
+
+# =========================================================
 # OBTENER USUARIO ACTUAL
 # =========================================================
 
 def obtener_usuario_actual(
-    credenciales: HTTPAuthorizationCredentials = Depends(security)
+    credenciales: HTTPAuthorizationCredentials = Depends(
+        security
+    )
 ):
 
     token = credenciales.credentials
@@ -148,7 +252,9 @@ def obtener_usuario_actual(
 # =========================================================
 
 def obtener_admin_actual(
-    usuario_actual: Usuario = Depends(obtener_usuario_actual)
+    usuario_actual: Usuario = Depends(
+        obtener_usuario_actual
+    )
 ):
 
     if not usuario_actual.es_admin:
@@ -282,7 +388,8 @@ def iniciar_sesion(
             "sub": str(usuario.id),
             "correo": usuario.correo,
             "es_admin": usuario.es_admin
-            }
+        }
+
         token = jwt.encode(
             datos_token,
             SECRET_KEY,
@@ -297,6 +404,190 @@ def iniciar_sesion(
 
 
 # =========================================================
+# RECUPERAR CONTRASEÑA - ENVIAR CÓDIGO
+# =========================================================
+
+@app.post("/usuarios/recuperar")
+def solicitar_recuperacion(
+    datos: SolicitarRecuperacion
+):
+
+    with Session(engine) as session:
+
+        usuario = session.exec(
+            select(Usuario).where(
+                Usuario.correo == datos.correo
+            )
+        ).first()
+
+        if not usuario:
+
+            raise HTTPException(
+                status_code=404,
+                detail="No existe una cuenta con ese correo"
+            )
+
+        # Generar código de 6 dígitos
+        codigo = str(
+            random.randint(
+                100000,
+                999999
+            )
+        )
+
+        # Código válido durante 24 horas
+        fecha_expiracion = (
+            datetime.now(timezone.utc)
+            + timedelta(hours=24)
+        ).isoformat()
+
+        # Invalidar códigos anteriores
+        codigos_anteriores = session.exec(
+            select(CodigoRecuperacion).where(
+                CodigoRecuperacion.correo == datos.correo,
+                CodigoRecuperacion.utilizado == False
+            )
+        ).all()
+
+        for codigo_anterior in codigos_anteriores:
+
+            codigo_anterior.utilizado = True
+
+            session.add(codigo_anterior)
+
+        # Crear nuevo código
+        nuevo_codigo = CodigoRecuperacion(
+            correo=datos.correo,
+            codigo=codigo,
+            fecha_expiracion=fecha_expiracion,
+            utilizado=False
+        )
+
+        session.add(nuevo_codigo)
+        session.commit()
+
+    # Enviar correo después de guardar el código
+    enviar_correo_recuperacion(
+        datos.correo,
+        codigo
+    )
+
+    return {
+        "mensaje": "Se envió un código de recuperación al correo"
+    }
+
+
+# =========================================================
+# VERIFICAR CÓDIGO
+# =========================================================
+
+@app.post("/usuarios/verificar-codigo")
+def verificar_codigo(
+    datos: VerificarCodigo
+):
+
+    with Session(engine) as session:
+
+        codigo_recuperacion = session.exec(
+            select(CodigoRecuperacion).where(
+                CodigoRecuperacion.correo == datos.correo,
+                CodigoRecuperacion.codigo == datos.codigo,
+                CodigoRecuperacion.utilizado == False
+            )
+        ).first()
+
+        if not codigo_recuperacion:
+
+            raise HTTPException(
+                status_code=400,
+                detail="Código incorrecto o ya utilizado"
+            )
+
+        fecha_expiracion = datetime.fromisoformat(
+            codigo_recuperacion.fecha_expiracion
+        )
+
+        if datetime.now(timezone.utc) > fecha_expiracion:
+
+            raise HTTPException(
+                status_code=400,
+                detail="El código ha expirado"
+            )
+
+        return {
+            "mensaje": "Código correcto"
+        }
+
+
+# =========================================================
+# CAMBIAR CONTRASEÑA
+# =========================================================
+
+@app.post("/usuarios/nueva-contrasena")
+def cambiar_contrasena(
+    datos: NuevaContrasena
+):
+
+    with Session(engine) as session:
+
+        codigo_recuperacion = session.exec(
+            select(CodigoRecuperacion).where(
+                CodigoRecuperacion.correo == datos.correo,
+                CodigoRecuperacion.codigo == datos.codigo,
+                CodigoRecuperacion.utilizado == False
+            )
+        ).first()
+
+        if not codigo_recuperacion:
+
+            raise HTTPException(
+                status_code=400,
+                detail="Código incorrecto o ya utilizado"
+            )
+
+        fecha_expiracion = datetime.fromisoformat(
+            codigo_recuperacion.fecha_expiracion
+        )
+
+        if datetime.now(timezone.utc) > fecha_expiracion:
+
+            raise HTTPException(
+                status_code=400,
+                detail="El código ha expirado"
+            )
+
+        usuario = session.exec(
+            select(Usuario).where(
+                Usuario.correo == datos.correo
+            )
+        ).first()
+
+        if not usuario:
+
+            raise HTTPException(
+                status_code=404,
+                detail="Usuario no encontrado"
+            )
+
+        # Guardar nueva contraseña hasheada
+        usuario.password = password_hash.hash(
+            datos.nueva_password
+        )
+
+        # Marcar código como utilizado
+        codigo_recuperacion.utilizado = True
+
+        session.add(usuario)
+        session.add(codigo_recuperacion)
+
+        session.commit()
+
+        return {
+            "mensaje": "Contraseña actualizada correctamente"
+        }
+
+
+# =========================================================
 # LISTAR USUARIOS
 # =========================================================
 
@@ -305,7 +596,9 @@ def iniciar_sesion(
     response_model=list[UsuarioRespuesta]
 )
 def listar_usuarios(
-    usuario_actual: Usuario = Depends(obtener_usuario_actual)
+    usuario_actual: Usuario = Depends(
+        obtener_usuario_actual
+    )
 ):
 
     with Session(engine) as session:
@@ -326,10 +619,65 @@ def listar_usuarios(
     response_model=UsuarioRespuesta
 )
 def obtener_mi_usuario(
-    usuario_actual: Usuario = Depends(obtener_usuario_actual)
+    usuario_actual: Usuario = Depends(
+        obtener_usuario_actual
+    )
 ):
 
     return usuario_actual
+
+
+# =========================================================
+# ACTUALIZAR MI PERFIL
+# =========================================================
+
+@app.put(
+    "/usuarios/me",
+    response_model=UsuarioRespuesta
+)
+def actualizar_mi_perfil(
+    datos: UsuarioActualizar,
+    usuario_actual: Usuario = Depends(
+        obtener_usuario_actual
+    )
+):
+
+    with Session(engine) as session:
+
+        usuario = session.get(
+            Usuario,
+            usuario_actual.id
+        )
+
+        if not usuario:
+
+            raise HTTPException(
+                status_code=404,
+                detail="Usuario no encontrado"
+            )
+
+        usuario_existente = session.exec(
+            select(Usuario).where(
+                Usuario.correo == datos.correo,
+                Usuario.id != usuario.id
+            )
+        ).first()
+
+        if usuario_existente:
+
+            raise HTTPException(
+                status_code=400,
+                detail="El correo ya está registrado por otro usuario"
+            )
+
+        usuario.nombre = datos.nombre
+        usuario.correo = datos.correo
+
+        session.add(usuario)
+        session.commit()
+        session.refresh(usuario)
+
+        return usuario
 
 
 # =========================================================
@@ -339,7 +687,9 @@ def obtener_mi_usuario(
 @app.delete("/usuarios/{usuario_id}")
 def eliminar_usuario(
     usuario_id: int,
-    usuario_actual: Usuario = Depends(obtener_usuario_actual)
+    usuario_actual: Usuario = Depends(
+        obtener_usuario_actual
+    )
 ):
 
     with Session(engine) as session:
@@ -374,7 +724,9 @@ def eliminar_usuario(
 )
 def registrar_punto(
     datos: PuntoRegistro,
-    usuario_actual: Usuario = Depends(obtener_usuario_actual)
+    usuario_actual: Usuario = Depends(
+        obtener_usuario_actual
+    )
 ):
 
     with Session(engine) as session:
@@ -428,7 +780,9 @@ def listar_puntos():
     response_model=list[PuntoRespuesta]
 )
 def listar_mis_puntos(
-    usuario_actual: Usuario = Depends(obtener_usuario_actual)
+    usuario_actual: Usuario = Depends(
+        obtener_usuario_actual
+    )
 ):
 
     with Session(engine) as session:
@@ -451,7 +805,9 @@ def listar_mis_puntos(
     response_model=list[PuntoRespuesta]
 )
 def listar_puntos_pendientes(
-    administrador: Usuario = Depends(obtener_admin_actual)
+    administrador: Usuario = Depends(
+        obtener_admin_actual
+    )
 ):
 
     with Session(engine) as session:
@@ -475,7 +831,9 @@ def listar_puntos_pendientes(
 )
 def aprobar_punto(
     punto_id: int,
-    administrador: Usuario = Depends(obtener_admin_actual)
+    administrador: Usuario = Depends(
+        obtener_admin_actual
+    )
 ):
 
     with Session(engine) as session:
@@ -511,7 +869,9 @@ def aprobar_punto(
 )
 def rechazar_punto(
     punto_id: int,
-    administrador: Usuario = Depends(obtener_admin_actual)
+    administrador: Usuario = Depends(
+        obtener_admin_actual
+    )
 ):
 
     with Session(engine) as session:

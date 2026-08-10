@@ -10,13 +10,24 @@ from sqlmodel import Field, SQLModel
 class Usuario(SQLModel, table=True):
     __tablename__ = "usuarios"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: Optional[int] = Field(
+        default=None,
+        primary_key=True
+    )
+
     nombre: str
-    correo: str = Field(index=True, unique=True)
+
+    correo: str = Field(
+        index=True,
+        unique=True
+    )
+
     password: str
 
     # Indica si el usuario es administrador
-    es_admin: bool = Field(default=False)
+    es_admin: bool = Field(
+        default=False
+    )
 
 
 # =========================================================
@@ -38,6 +49,15 @@ class UsuarioRespuesta(SQLModel):
     nombre: str
     correo: str
     es_admin: bool
+
+
+# =========================================================
+# ACTUALIZAR USUARIO
+# =========================================================
+
+class UsuarioActualizar(SQLModel):
+    nombre: str
+    correo: str
 
 
 # =========================================================
@@ -66,7 +86,10 @@ class TokenRespuesta(SQLModel):
 class Punto(SQLModel, table=True):
     __tablename__ = "puntos"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: Optional[int] = Field(
+        default=None,
+        primary_key=True
+    )
 
     nombre: str
     descripcion: str
@@ -77,9 +100,13 @@ class Punto(SQLModel, table=True):
     latitud: float
     longitud: float
 
-    estado: str = Field(default="pendiente")
+    estado: str = Field(
+        default="pendiente"
+    )
 
-    usuario_id: int = Field(foreign_key="usuarios.id")
+    usuario_id: int = Field(
+        foreign_key="usuarios.id"
+    )
 
 
 # =========================================================
@@ -111,3 +138,55 @@ class PuntoRespuesta(SQLModel):
     longitud: float
     estado: str
     usuario_id: int
+
+
+# =========================================================
+# CÓDIGO DE RECUPERACIÓN DE CONTRASEÑA
+# =========================================================
+
+class CodigoRecuperacion(SQLModel, table=True):
+    __tablename__ = "codigos_recuperacion"
+
+    id: Optional[int] = Field(
+        default=None,
+        primary_key=True
+    )
+
+    correo: str = Field(
+        index=True
+    )
+
+    codigo: str
+
+    fecha_expiracion: str
+
+    utilizado: bool = Field(
+        default=False
+    )
+
+
+# =========================================================
+# SOLICITAR RECUPERACIÓN
+# =========================================================
+
+class SolicitarRecuperacion(SQLModel):
+    correo: str
+
+
+# =========================================================
+# VERIFICAR CÓDIGO
+# =========================================================
+
+class VerificarCodigo(SQLModel):
+    correo: str
+    codigo: str
+
+
+# =========================================================
+# CAMBIAR CONTRASEÑA
+# =========================================================
+
+class NuevaContrasena(SQLModel):
+    correo: str
+    codigo: str
+    nueva_password: str

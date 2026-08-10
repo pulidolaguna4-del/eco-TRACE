@@ -24,32 +24,93 @@ function Login() {
     setCargando(true)
 
     try {
-      const respuesta = await fetch('http://127.0.0.1:8000/usuarios/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          correo: correo,
-          password: password
-        })
-      })
+      // =====================================================
+      // LOGIN
+      // =====================================================
+
+      const respuesta = await fetch(
+        'http://127.0.0.1:8000/usuarios/login',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            correo: correo,
+            password: password
+          })
+        }
+      )
 
       const datos = await respuesta.json()
 
       if (!respuesta.ok) {
-        setMensaje(datos.detail || 'Correo o contraseña incorrectos')
+        setMensaje(
+          datos.detail || 'Correo o contraseña incorrectos'
+        )
         return
       }
 
-      localStorage.setItem('access_token', datos.access_token)
+      // =====================================================
+      // GUARDAR TOKEN
+      // =====================================================
+
+      localStorage.setItem(
+        'access_token',
+        datos.access_token
+      )
+
+      // =====================================================
+      // OBTENER USUARIO REAL
+      // =====================================================
+
+      const respuestaUsuario = await fetch(
+        'http://127.0.0.1:8000/usuarios/me',
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${datos.access_token}`
+          }
+        }
+      )
+
+      const usuario = await respuestaUsuario.json()
+
+      if (!respuestaUsuario.ok) {
+        localStorage.removeItem('access_token')
+
+        setMensaje(
+          usuario.detail ||
+          'No se pudo obtener la información del usuario'
+        )
+
+        return
+      }
+
+      // =====================================================
+      // GUARDAR USUARIO
+      // =====================================================
+
+      localStorage.setItem(
+        'usuario',
+        JSON.stringify(usuario)
+      )
 
       setMensaje('Inicio de sesión exitoso')
 
-      navigate('/')
+      // =====================================================
+      // IR AL HOME
+      // =====================================================
+
+      navigate('/home')
+
     } catch (error) {
       console.error(error)
-      setMensaje('No se pudo conectar con el servidor')
+
+      setMensaje(
+        'No se pudo conectar con el servidor'
+      )
+
     } finally {
       setCargando(false)
     }
@@ -68,7 +129,10 @@ function Login() {
         <form onSubmit={handleSubmit} noValidate>
 
           <div className="form-group">
-            <label htmlFor="email">Correo electrónico</label>
+
+            <label htmlFor="email">
+              Correo electrónico
+            </label>
 
             <input
               type="email"
@@ -77,10 +141,14 @@ function Login() {
               value={correo}
               onChange={(e) => setCorreo(e.target.value)}
             />
+
           </div>
 
           <div className="form-group">
-            <label htmlFor="password">Contraseña</label>
+
+            <label htmlFor="password">
+              Contraseña
+            </label>
 
             <input
               type="password"
@@ -89,10 +157,19 @@ function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
+
           </div>
 
+          {/* =================================================
+              RECUPERAR CONTRASEÑA
+          ================================================= */}
+
           <div className="forgot-password">
-            <a href="#">¿Olvidaste tu contraseña?</a>
+
+            <Link to="/recuperar-password">
+              ¿Olvidaste tu contraseña?
+            </Link>
+
           </div>
 
           <button
@@ -100,7 +177,9 @@ function Login() {
             className="login-button"
             disabled={cargando}
           >
-            {cargando ? 'Iniciando sesión...' : 'Iniciar sesión'}
+            {cargando
+              ? 'Iniciando sesión...'
+              : 'Iniciar sesión'}
           </button>
 
         </form>
@@ -112,10 +191,15 @@ function Login() {
         )}
 
         <div className="register">
+
           <p>
             ¿No tienes una cuenta?{' '}
-            <Link to="/register">Crear cuenta</Link>
+
+            <Link to="/register">
+              Crear cuenta
+            </Link>
           </p>
+
         </div>
 
       </div>
