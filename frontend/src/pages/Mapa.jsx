@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import {
   MapContainer,
@@ -15,6 +16,7 @@ import booleanPointInPolygon from '@turf/boolean-point-in-polygon'
 
 import 'leaflet/dist/leaflet.css'
 import './Mapa.css'
+
 
 function SelectorUbicacion({
   seleccionando,
@@ -67,6 +69,7 @@ function SelectorUbicacion({
   return null
 }
 
+
 function obtenerIconoPorTipo(tipo) {
   const tipoNormalizado = tipo?.toLowerCase()
 
@@ -116,14 +119,15 @@ function obtenerIconoPorTipo(tipo) {
 }
 
 
-
-
 function Mapa() {
+
+  const navigate = useNavigate()
 
   const centroCiudadBolivar = [4.575, -74.160]
 
   const [puntos, setPuntos] = useState([])
-  const [limiteCiudadBolivar, setLimiteCiudadBolivar] = useState(null)
+  const [limiteCiudadBolivar, setLimiteCiudadBolivar] =
+    useState(null)
 
   const [tipoSeleccionado, setTipoSeleccionado] =
     useState('Todos')
@@ -398,7 +402,8 @@ function Mapa() {
 
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            'Authorization':
+              `Bearer ${token}`
           },
 
           body:
@@ -437,18 +442,20 @@ function Mapa() {
 
 
       setMensaje(
-  '¡Punto creado correctamente! Quedó pendiente de aprobación.'
-)
+        '¡Punto creado correctamente! Quedó pendiente de aprobación.'
+      )
 
-setFormulario({
-  nombre: '',
-  descripcion: '',
-  direccion: '',
-  tipo: ''
-})
 
-setUbicacionSeleccionada(null)
-setSeleccionando(false)
+      setFormulario({
+        nombre: '',
+        descripcion: '',
+        direccion: '',
+        tipo: ''
+      })
+
+
+      setUbicacionSeleccionada(null)
+      setSeleccionando(false)
 
 
       const respuestaPuntos =
@@ -501,26 +508,33 @@ setSeleccionando(false)
 
     <div className="mapa-page">
 
-      <div className="mapa-header">
+      {/* BOTÓN VOLVER */}
 
-        <div>
+      <button
+        type="button"
+        onClick={() => navigate('/')}
+        style={{
+          marginBottom: '15px',
+          padding: '10px 18px',
+          border: 'none',
+          borderRadius: '8px',
+          background: '#218739',
+          color: 'white',
+          fontSize: '15px',
+          fontWeight: '600',
+          cursor: 'pointer'
+        }}
+      >
+        ← Volver al inicio
+      </button>
 
-          <h1>
-            eco-TRACE
-          </h1>
 
-          <p>
-            Puntos de reciclaje y donación
-            de Ciudad Bolívar
-          </p>
-
-        </div>
-
-      </div>
-
+      {/* CONTENEDOR DEL MAPA */}
 
       <div className="mapa-container">
 
+
+        {/* FILTROS Y BOTONES */}
 
         <div
           style={{
@@ -631,6 +645,8 @@ setSeleccionando(false)
         </div>
 
 
+        {/* MENSAJE DE SELECCIÓN */}
+
         {seleccionando && (
 
           <div
@@ -649,6 +665,8 @@ setSeleccionando(false)
 
         )}
 
+
+        {/* UBICACIÓN SELECCIONADA */}
 
         {ubicacionSeleccionada && (
 
@@ -687,6 +705,8 @@ setSeleccionando(false)
         )}
 
 
+        {/* FORMULARIO */}
+
         {mostrarFormulario && (
 
           <div
@@ -715,7 +735,6 @@ setSeleccionando(false)
                 crearPunto
               }
             >
-
 
               <div className="form-group">
 
@@ -881,13 +900,14 @@ setSeleccionando(false)
 
               </button>
 
-
             </form>
 
           </div>
 
         )}
 
+
+        {/* CARGANDO */}
 
         {cargando && (
 
@@ -897,6 +917,8 @@ setSeleccionando(false)
 
         )}
 
+
+        {/* ERROR */}
 
         {error && !mostrarFormulario && (
 
@@ -908,6 +930,8 @@ setSeleccionando(false)
 
         )}
 
+
+        {/* MAPA */}
 
         <MapContainer
           center={
@@ -927,9 +951,11 @@ setSeleccionando(false)
 
 
           <SelectorUbicacion
-          seleccionando={seleccionando}
-          setUbicacion={manejarUbicacion}
-          limiteCiudadBolivar={limiteCiudadBolivar}
+            seleccionando={seleccionando}
+            setUbicacion={manejarUbicacion}
+            limiteCiudadBolivar={
+              limiteCiudadBolivar
+            }
           />
 
 
@@ -951,13 +977,17 @@ setSeleccionando(false)
             (punto) => (
 
               <Marker
-              key={punto.id}
-              position={[
-                punto.latitud,
-                punto.longitud
-            ]}
-            icon={obtenerIconoPorTipo(punto.tipo)}
-            >
+                key={punto.id}
+                position={[
+                  punto.latitud,
+                  punto.longitud
+                ]}
+                icon={
+                  obtenerIconoPorTipo(
+                    punto.tipo
+                  )
+                }
+              >
 
                 <Popup>
 
@@ -1023,10 +1053,7 @@ setSeleccionando(false)
       </div>
 
     </div>
-
   )
 }
 
-
 export default Mapa
-
