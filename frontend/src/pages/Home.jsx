@@ -158,12 +158,11 @@ function Home() {
             </p>
 
             <button
-              type="button"
-              className="primary-button"
-              onClick={irAlMapa}
+            className="primary-button"
+            onClick={() => navigate('/mapa')}
             >
               Ver mapa
-            </button>
+              </button>
 
           </div>
 
@@ -183,12 +182,11 @@ function Home() {
             </p>
 
             <button
-              type="button"
-              className="primary-button"
-              onClick={irAAgregarPunto}
+            className="primary-button"
+            onClick={() => navigate('/mapa')}
             >
               Agregar punto
-            </button>
+              </button>
 
           </div>
 
@@ -208,12 +206,11 @@ function Home() {
             </p>
 
             <button
-              type="button"
-              className="primary-button"
-              onClick={irAlMapa}
+            className="primary-button"
+            onClick={() => navigate('/mapa')}
             >
               Explorar
-            </button>
+              </button>
 
           </div>
 

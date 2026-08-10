@@ -20,6 +20,7 @@ function Admin() {
     try {
       setCargando(true)
       setError('')
+      setMensaje('')
 
       const respuesta = await fetch(
         'http://127.0.0.1:8000/admin/puntos/pendientes',
@@ -33,18 +34,20 @@ function Admin() {
       const datos = await respuesta.json()
 
       if (!respuesta.ok) {
-  if (
-    respuesta.status === 401 ||
-    respuesta.status === 403
-  ) {
-    window.location.href = '/mapa'
-    return
-  }
+        if (respuesta.status === 401) {
+          setError('Debes iniciar sesión')
+          return
+        }
 
-  throw new Error(
-    datos.detail || 'No se pudieron cargar los puntos'
-  )
-}
+        if (respuesta.status === 403) {
+          setError('Debes iniciar sesión como administrador')
+          return
+        }
+
+        throw new Error(
+          datos.detail || 'No se pudieron cargar los puntos'
+        )
+      }
 
       setPuntos(datos)
     } catch (error) {
