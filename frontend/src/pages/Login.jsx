@@ -1,7 +1,53 @@
 import './Login.css'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 
 function Login() {
+  const navigate = useNavigate()
+
+  const [correo, setCorreo] = useState('')
+  const [password, setPassword] = useState('')
+  const [mensaje, setMensaje] = useState('')
+  const [cargando, setCargando] = useState(false)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+
+    setMensaje('')
+    setCargando(true)
+
+    try {
+      const respuesta = await fetch('http://127.0.0.1:8000/usuarios/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          correo: correo,
+          password: password
+        })
+      })
+
+      const datos = await respuesta.json()
+
+      if (!respuesta.ok) {
+        setMensaje(datos.detail || 'Correo o contraseña incorrectos')
+        return
+      }
+
+      localStorage.setItem('access_token', datos.access_token)
+
+      setMensaje('Inicio de sesión exitoso')
+
+      navigate('/')
+    } catch (error) {
+      console.error(error)
+      setMensaje('No se pudo conectar con el servidor')
+    } finally {
+      setCargando(false)
+    }
+  }
+
   return (
     <div className="login-container">
 
@@ -12,22 +58,31 @@ function Login() {
           <p>Conecta, recicla y transforma</p>
         </div>
 
-        <form>
+        <form onSubmit={handleSubmit}>
+
           <div className="form-group">
             <label htmlFor="email">Correo electrónico</label>
+
             <input
               type="email"
               id="email"
               placeholder="Ingresa tu correo"
+              value={correo}
+              onChange={(e) => setCorreo(e.target.value)}
+              required
             />
           </div>
 
           <div className="form-group">
             <label htmlFor="password">Contraseña</label>
+
             <input
               type="password"
               id="password"
               placeholder="Ingresa tu contraseña"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
             />
           </div>
 
@@ -35,10 +90,21 @@ function Login() {
             <a href="#">¿Olvidaste tu contraseña?</a>
           </div>
 
-          <button type="submit" className="login-button">
-            Iniciar sesión
+          <button
+            type="submit"
+            className="login-button"
+            disabled={cargando}
+          >
+            {cargando ? 'Iniciando sesión...' : 'Iniciar sesión'}
           </button>
+
         </form>
+
+        {mensaje && (
+          <p className="login-message">
+            {mensaje}
+          </p>
+        )}
 
         <div className="register">
           <p>
@@ -54,3 +120,4 @@ function Login() {
 }
 
 export default Login
+

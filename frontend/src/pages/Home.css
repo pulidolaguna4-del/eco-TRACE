@@ -1,0 +1,181 @@
+.home-container {
+  min-height: 100vh;
+  background: #f1f8f4;
+}
+
+.home-header {
+  background: white;
+  padding: 20px 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+.home-header h1 {
+  margin: 0;
+  color: #218739;
+  font-size: 30px;
+}
+
+.home-header p {
+  margin: 5px 0 0;
+  color: #666;
+}
+
+.logout-button {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 8px;
+  background: #218739;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.logout-button:hover {
+  background: #176b2b;
+}
+
+.home-main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 50px 20px;
+}
+
+.welcome-section {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.welcome-section h2 {
+  color: #218739;
+  font-size: 32px;
+  margin-bottom: 10px;
+}
+
+.welcome-section p {
+  color: #666;
+  font-size: 17px;
+}
+
+.options-section {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 25px;
+}
+
+.option-card {
+  background: white;
+  padding: 30px;
+  border-radius: 18px;
+  text-align: center;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+}
+
+.option-icon {
+  font-size: 45px;
+  margin-bottom: 15px;
+}
+
+.option-card h3 {
+  color: #218739;
+  font-size: 22px;
+  margin-bottom: 10px;
+}
+
+.option-card p {
+  color: #666;
+  line-height: 1.5;
+  min-height: 70px;
+}
+
+.primary-button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 15px;
+  border: none;
+  border-radius: 9px;
+  background: #218739;
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary-button:hover {
+  background: #176b2b;
+}
+
+@media (max-width: 800px) {
+  .options-section {
+    grid-template-columns: 1fr;
+  }
+
+  .home-header {
+    padding: 20px;
+  }
+}
+
+.points-section {
+  margin-top: 50px;
+}
+
+.points-section h2 {
+  text-align: center;
+  color: #218739;
+  font-size: 28px;
+  margin-bottom: 25px;
+}
+
+.points-message {
+  text-align: center;
+  color: #666;
+  padding: 30px;
+}
+
+.points-error {
+  text-align: center;
+  color: #d93025;
+  padding: 30px;
+}
+
+.points-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 25px;
+}
+
+.point-card {
+  background: white;
+  padding: 25px;
+  border-radius: 16px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+}
+
+.point-icon {
+  font-size: 35px;
+  margin-bottom: 10px;
+}
+
+.point-card h3 {
+  color: #218739;
+  margin-bottom: 15px;
+}
+
+.point-card p {
+  color: #666;
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+.point-card strong {
+  color: #333;
+}
+
+@media (max-width: 800px) {
+  .points-grid {
+    grid-template-columns: 1fr;
+  }
+}
+

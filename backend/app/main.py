@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlmodel import SQLModel, Session, select
 from pwdlib import PasswordHash
@@ -33,9 +34,24 @@ if not SECRET_KEY:
 
 ALGORITHM = "HS256"
 
-
 app = FastAPI(
     title="Eco-TRACE API"
+)
+
+
+# =========================================================
+# CORS - PERMITIR FRONTEND REACT
+# =========================================================
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -264,9 +280,9 @@ def iniciar_sesion(
 
         datos_token = {
             "sub": str(usuario.id),
-            "correo": usuario.correo
-        }
-
+            "correo": usuario.correo,
+            "es_admin": usuario.es_admin
+            }
         token = jwt.encode(
             datos_token,
             SECRET_KEY,
@@ -518,45 +534,4 @@ def rechazar_punto(
         session.commit()
         session.refresh(punto)
 
-# =========================================================
-# CONVERTIR USUARIO EN ADMINISTRADOR
-# =========================================================
-
-@app.put("/hacer-admin/{usuario_id}")
-def hacer_admin(usuario_id: int):
-
-    with Session(engine) as session:
-
-        usuario = session.get(
-            Usuario,
-            usuario_id
-        )
-
-        if not usuario:
-
-            raise HTTPException(
-                status_code=404,
-                detail="Usuario no encontrado"
-            )
-
-        usuario.es_admin = True
-
-        session.add(usuario)
-        session.commit()
-        session.refresh(usuario)
-
-        return {
-            "mensaje": "Usuario convertido en administrador",
-            "usuario": {
-                "id": usuario.id,
-                "nombre": usuario.nombre,
-                "correo": usuario.correo,
-                "es_admin": usuario.es_admin
-            }
-        }
-
         return punto
-
-
-
-    

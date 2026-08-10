@@ -25,7 +25,7 @@ function Register() {
     setMensaje('')
   }
 
-  const manejarRegistro = (e) => {
+  const manejarRegistro = async (e) => {
     e.preventDefault()
 
     const { name, email, password, confirmPassword } = formulario
@@ -50,8 +50,45 @@ function Register() {
       return
     }
 
-    setError('')
-    setMensaje('Registro válido. ¡Cuenta lista para crear!')
+    try {
+      const respuesta = await fetch(
+        'http://127.0.0.1:8000/usuarios/registro',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            nombre: name,
+            correo: email,
+            password: password
+          })
+        }
+      )
+
+      const datos = await respuesta.json()
+
+      if (!respuesta.ok) {
+        setError(datos.detail || 'No se pudo crear la cuenta')
+        return
+      }
+
+      setError('')
+      setMensaje(
+        '¡Cuenta creada correctamente! Ya puedes iniciar sesión.'
+      )
+
+      setFormulario({
+        name: '',
+        email: '',
+        password: '',
+        confirmPassword: ''
+      })
+
+    } catch (error) {
+      console.error(error)
+      setError('No se pudo conectar con el servidor')
+    }
   }
 
   return (
@@ -159,3 +196,4 @@ function Register() {
 }
 
 export default Register
+
