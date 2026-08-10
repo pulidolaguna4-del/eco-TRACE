@@ -1,48 +1,24 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
+
+import Navbar from './components/Navbar'
+
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Home from './pages/Home'
 import Mapa from './pages/Mapa'
-import Admin from './pages/Admin'
 
 function App() {
   return (
-    <Routes>
+    <>
+      <Navbar />
 
-      <Route
-        path="/login"
-        element={<Login />}
-      />
-
-      <Route
-        path="/register"
-        element={<Register />}
-      />
-
-      <Route
-        path="/"
-        element={<Home />}
-      />
-
-      <Route
-        path="/mapa"
-        element={<Mapa />}
-      />
-
-      <Route
-        path="/admin"
-        element={<Admin />}
-      />
-
-
-      <Route
-        path="*"
-        element={<Navigate to="/login" replace />}
-      />
-
-      
-
-    </Routes>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/mapa" element={<Mapa />} />
+      </Routes>
+    </>
   )
 }
 

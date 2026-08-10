@@ -1,0 +1,180 @@
+.navbar {
+  width: 100%;
+  height: 70px;
+  background-color: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0 35px;
+  box-sizing: border-box;
+
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+/* =========================
+   LOGO
+========================= */
+
+.navbar-logo a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  text-decoration: none;
+  color: #166534;
+
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.navbar-logo span {
+  letter-spacing: 0.5px;
+}
+
+/* =========================
+   MENÚ
+========================= */
+
+.navbar-menu {
+  display: flex;
+  align-items: center;
+  gap: 25px;
+}
+
+.navbar-menu a {
+  text-decoration: none;
+  color: #374151;
+
+  font-size: 15px;
+  font-weight: 500;
+
+  transition: color 0.2s ease;
+}
+
+.navbar-menu a:hover {
+  color: #16a34a;
+}
+
+/* =========================
+   ADMINISTRACIÓN
+========================= */
+
+.navbar-menu .navbar-admin {
+  color: #b45309;
+  font-weight: 600;
+}
+
+.navbar-menu .navbar-admin:hover {
+  color: #92400e;
+}
+
+/* =========================
+   USUARIO
+========================= */
+
+.navbar-user {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.navbar-welcome {
+  color: #374151;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* =========================
+   BOTÓN CERRAR SESIÓN
+========================= */
+
+.navbar-logout {
+  border: none;
+  background-color: #dc2626;
+  color: white;
+
+  padding: 9px 15px;
+  border-radius: 7px;
+
+  font-size: 14px;
+  font-weight: 500;
+
+  cursor: pointer;
+
+  transition: background-color 0.2s ease;
+}
+
+.navbar-logout:hover {
+  background-color: #b91c1c;
+}
+
+/* =========================
+   LOGIN
+========================= */
+
+.navbar-login {
+  text-decoration: none;
+
+  background-color: #16a34a;
+  color: white;
+
+  padding: 9px 16px;
+  border-radius: 7px;
+
+  font-size: 14px;
+  font-weight: 500;
+
+  transition: background-color 0.2s ease;
+}
+
+.navbar-login:hover {
+  background-color: #15803d;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 1100px) {
+  .navbar {
+    padding: 0 20px;
+  }
+
+  .navbar-menu {
+    gap: 15px;
+  }
+
+  .navbar-menu a {
+    font-size: 14px;
+  }
+
+  .navbar-welcome {
+    display: none;
+  }
+}
+
+@media (max-width: 800px) {
+  .navbar {
+    height: auto;
+    min-height: 70px;
+
+    flex-wrap: wrap;
+    gap: 15px;
+
+    padding: 15px 20px;
+  }
+
+  .navbar-menu {
+    order: 3;
+    width: 100%;
+
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+}
+
