@@ -14,6 +14,13 @@ function Login() {
     e.preventDefault()
 
     setMensaje('')
+
+    // Validación de campos vacíos
+    if (!correo.trim() || !password.trim()) {
+      setMensaje('Por favor completa todos los campos')
+      return
+    }
+
     setCargando(true)
 
     try {
@@ -58,7 +65,7 @@ function Login() {
           <p>Conecta, recicla y transforma</p>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
 
           <div className="form-group">
             <label htmlFor="email">Correo electrónico</label>
@@ -69,7 +76,6 @@ function Login() {
               placeholder="Ingresa tu correo"
               value={correo}
               onChange={(e) => setCorreo(e.target.value)}
-              required
             />
           </div>
 
@@ -82,7 +88,6 @@ function Login() {
               placeholder="Ingresa tu contraseña"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              required
             />
           </div>
 
@@ -120,4 +125,3 @@ function Login() {
 }
 
 export default Login
-
