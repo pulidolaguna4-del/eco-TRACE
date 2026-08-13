@@ -1,5 +1,55 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { motion, useReducedMotion } from 'framer-motion'
+
+// =========================================================
+// COMPONENTE PARA ANIMAR TEXTO CARÁCTER POR CARÁCTER
+// =========================================================
+function TextoAnimado({ texto }) {
+  const prefiereReducido = useReducedMotion()
+
+  if (prefiereReducido) {
+    return <span>{texto}</span>
+  }
+
+  const letras = Array.from(texto)
+
+  const contenedorVariantes = {
+    oculto: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.02, delayChildren: 0.1 }
+    }
+  }
+
+  const letraVariantes = {
+    oculto: { opacity: 0, x: -10 },
+    visible: {
+      opacity: 1,
+      x: 0,
+      transition: { type: 'spring', stiffness: 120, damping: 12 }
+    }
+  }
+
+  return (
+    <motion.span
+      variants={contenedorVariantes}
+      initial="oculto"
+      animate="visible"
+      className="inline-block"
+    >
+      {letras.map((letra, indice) => (
+        <motion.span
+          key={indice}
+          variants={letraVariantes}
+          className="inline-block whitespace-pre"
+        >
+          {letra}
+        </motion.span>
+      ))}
+    </motion.span>
+  )
+}
 
 function Home() {
   const navigate = useNavigate()
@@ -9,10 +59,9 @@ function Home() {
   const [error, setError] = useState('')
   const [esAdmin, setEsAdmin] = useState(false)
 
+  const prefiereReducido = useReducedMotion()
+
   useEffect(() => {
-    // =====================================================
-    // COMPROBAR USUARIO
-    // =====================================================
     const usuarioGuardado = localStorage.getItem('usuario')
     if (usuarioGuardado) {
       try {
@@ -23,9 +72,6 @@ function Home() {
       }
     }
 
-    // =====================================================
-    // CARGAR PUNTOS
-    // =====================================================
     const cargarPuntos = async () => {
       try {
         const respuesta = await fetch('http://127.0.0.1:8000/puntos')
@@ -45,10 +91,30 @@ function Home() {
     cargarPuntos()
   }, [])
 
+  // Animaciones de entrada escalonada para el resto del contenido (Stagger)
+  const contenedorVariantes = {
+    oculto: {},
+    visible: {
+      transition: {
+        staggerChildren: prefiereReducido ? 0 : 0.08,
+        delayChildren: prefiereReducido ? 0 : 0.4
+      }
+    }
+  }
+
+  const elementoVariantes = {
+    oculto: { opacity: 0, y: prefiereReducido ? 0 : 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { type: 'spring', stiffness: 90, damping: 15 }
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#f1f8f4] font-sans text-[#333333]">
       {/* HERO SECTION LLAMATIVA */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-[#218739] via-[#1b7230] to-[#125321] text-white py-20 px-4 sm:px-6 lg:px-8 shadow-inner">
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#218739] via-[#1b7230] to-[#125321] text-white py-24 px-4 sm:px-6 lg:px-8 shadow-inner">
         {/* Elemento decorativo flotante */}
         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-80 h-80 rounded-full bg-white/5 blur-3xl pointer-events-none"></div>
         <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 rounded-full bg-black/10 blur-3xl pointer-events-none"></div>
@@ -57,32 +123,55 @@ function Home() {
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 text-white border border-white/20 text-xs font-semibold mb-6 uppercase tracking-wider backdrop-blur-xs">
             🌱 Sostenibilidad Ciudadana Activa
           </div>
+
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight mb-6">
-            Conecta, Recicla y Transforma con <span className="text-[#a5f3fc]">eco-TRACE</span>
+            <TextoAnimado texto="Conecta, Recicla y Transforma con " />
+            <span className="text-[#a5f3fc]">eco-TRACE</span>
           </h1>
-          <p className="text-lg sm:text-xl text-emerald-100/90 max-w-2xl mx-auto mb-10 leading-relaxed">
+
+          <motion.p
+            initial={{ opacity: 0, y: prefiereReducido ? 0 : 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5, duration: 0.5 }}
+            className="text-lg sm:text-xl text-emerald-100/90 max-w-2xl mx-auto mb-10 leading-relaxed"
+          >
             La red comunitaria de puntos ecológicos verificados. Encuentra, registra y valida lugares de reciclaje, donación de ropa y desecho electrónico en tu ciudad.
-          </p>
-          <div className="flex flex-wrap justify-center gap-4">
-            <button
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: prefiereReducido ? 0 : 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.7, duration: 0.5 }}
+            className="flex flex-wrap justify-center gap-4"
+          >
+            <motion.button
+              whileHover={prefiereReducido ? {} : { scale: 1.03 }}
+              whileTap={prefiereReducido ? {} : { scale: 0.97 }}
               onClick={() => navigate('/mapa')}
               className="px-8 py-3.5 bg-white text-[#218739] hover:bg-emerald-50 text-sm font-bold rounded-xl shadow-md hover:shadow-lg transition-all duration-150 cursor-pointer"
             >
               Explorar el Mapa
-            </button>
-            <button
+            </motion.button>
+            <motion.button
+              whileHover={prefiereReducido ? {} : { scale: 1.03 }}
+              whileTap={prefiereReducido ? {} : { scale: 0.97 }}
               onClick={() => navigate('/register')}
               className="px-8 py-3.5 bg-[#218739] hover:bg-[#176b2b] text-white border border-white/30 text-sm font-bold rounded-xl shadow-md hover:shadow-lg transition-all duration-150 cursor-pointer"
             >
               Únete a la Comunidad
-            </button>
-          </div>
+            </motion.button>
+          </motion.div>
         </div>
       </section>
 
       {/* METRICAS DE IMPACTO AMBIENTAL */}
       <section className="max-w-7xl mx-auto -mt-10 px-4 sm:px-6 lg:px-8 mb-16 relative z-20">
-        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 sm:p-8 grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
+        <motion.div
+          initial={{ opacity: 0, scale: prefiereReducido ? 1 : 0.97 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.8, type: 'spring', stiffness: 100, damping: 15 }}
+          className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 sm:p-8 grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 divide-y sm:divide-y-0 sm:divide-x divide-gray-100"
+        >
           <div className="text-center sm:pb-0 pb-6">
             <div className="text-3xl sm:text-4xl font-extrabold text-[#218739] mb-1">
               {cargando ? '...' : puntos.length}
@@ -100,19 +189,28 @@ function Home() {
             <div className="text-sm font-bold text-gray-700">Categorías de Residuos</div>
             <p className="text-xs text-gray-400 mt-1 max-w-xs mx-auto">Clasificados en reciclables tradicionales, ropa y residuos electrónicos.</p>
           </div>
-        </div>
+        </motion.div>
       </section>
 
-      {/* SECCIÓN DE OPCIONES Y ACCIONES */}
+      {/* SECCIÓN DE OPCIONES Y ACCIONES CON ENTRADA ESCALONADA (STAGGER) */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-20">
         <div className="text-center mb-12">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900">¿Qué deseas hacer hoy?</h2>
           <p className="text-sm text-gray-500 mt-2">Interactúa con la plataforma y sé parte del cambio ecológico.</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+        <motion.div
+          variants={contenedorVariantes}
+          initial="oculto"
+          animate="visible"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8"
+        >
           {/* MAPA CARD */}
-          <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-200 flex flex-col justify-between group">
+          <motion.div
+            variants={elementoVariantes}
+            whileHover={prefiereReducido ? {} : { y: -5, scale: 1.02 }}
+            className="bg-white p-8 rounded-2xl border border-gray-100 shadow-xs hover:shadow-lg transition-all duration-200 flex flex-col justify-between group"
+          >
             <div>
               <div className="w-14 h-14 rounded-xl bg-green-50 flex items-center justify-center text-3xl mb-6 group-hover:scale-110 transition-transform duration-200">
                 🗺️
@@ -128,10 +226,14 @@ function Home() {
             >
               Ver mapa interactivo
             </button>
-          </div>
+          </motion.div>
 
           {/* AGREGAR PUNTO CARD */}
-          <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-200 flex flex-col justify-between group">
+          <motion.div
+            variants={elementoVariantes}
+            whileHover={prefiereReducido ? {} : { y: -5, scale: 1.02 }}
+            className="bg-white p-8 rounded-2xl border border-gray-100 shadow-xs hover:shadow-lg transition-all duration-200 flex flex-col justify-between group"
+          >
             <div>
               <div className="w-14 h-14 rounded-xl bg-emerald-50 flex items-center justify-center text-3xl mb-6 group-hover:scale-110 transition-transform duration-200">
                 ➕
@@ -147,10 +249,14 @@ function Home() {
             >
               Registrar punto ecológico
             </button>
-          </div>
+          </motion.div>
 
           {/* RECICLAJE CARD */}
-          <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-200 flex flex-col justify-between group">
+          <motion.div
+            variants={elementoVariantes}
+            whileHover={prefiereReducido ? {} : { y: -5, scale: 1.02 }}
+            className="bg-white p-8 rounded-2xl border border-gray-100 shadow-xs hover:shadow-lg transition-all duration-200 flex flex-col justify-between group"
+          >
             <div>
               <div className="w-14 h-14 rounded-xl bg-teal-50 flex items-center justify-center text-3xl mb-6 group-hover:scale-110 transition-transform duration-200">
                 ♻️
@@ -166,11 +272,14 @@ function Home() {
             >
               Guía de materiales
             </button>
-          </div>
+          </motion.div>
 
           {/* PANEL ADMIN (SOLO VISIBLE SI ES ADMIN) */}
           {esAdmin && (
-            <div className="sm:col-span-2 lg:col-span-3 bg-amber-50/50 border border-amber-200 rounded-2xl p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 shadow-xs">
+            <motion.div
+              variants={elementoVariantes}
+              className="sm:col-span-2 lg:col-span-3 bg-amber-50/50 border border-amber-200 rounded-2xl p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 shadow-xs"
+            >
               <div className="flex gap-4 items-start">
                 <div className="text-3xl p-3 bg-amber-100 rounded-xl">🛡️</div>
                 <div>
@@ -180,18 +289,20 @@ function Home() {
                   </p>
                 </div>
               </div>
-              <button
+              <motion.button
+                whileHover={prefiereReducido ? {} : { scale: 1.02 }}
+                whileTap={prefiereReducido ? {} : { scale: 0.98 }}
                 onClick={() => navigate('/admin')}
                 className="shrink-0 px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold rounded-xl shadow-xs hover:shadow-md transition-colors duration-150 cursor-pointer"
               >
                 Ir al Panel Admin
-              </button>
-            </div>
+              </motion.button>
+            </motion.div>
           )}
-        </div>
+        </motion.div>
       </section>
 
-      {/* LISTADO DE PUNTOS DISPONIBLES (APROBADOS) */}
+      {/* LISTADO DE PUNTOS DISPONIBLES (APROBADOS) CON SKELETON */}
       <section className="bg-white border-t border-gray-100 py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-14">
@@ -199,11 +310,26 @@ function Home() {
             <p className="text-sm text-gray-500 mt-2">Ubicaciones activas y completamente validadas dentro de la ciudad.</p>
           </div>
 
-          {/* CARGANDO */}
+          {/* CARGANDO CON SKELETON LOADERS */}
           {cargando && (
-            <div className="py-12 flex flex-col items-center justify-center gap-3">
-              <div className="w-8 h-8 border-4 border-[#218739]/30 border-t-[#218739] rounded-full animate-spin"></div>
-              <p className="text-sm text-gray-500 font-medium">Cargando puntos ecológicos...</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+              {[1, 2, 3].map((n) => (
+                <div key={n} className="bg-white border border-gray-100 rounded-2xl p-6 shadow-xs space-y-4 animate-pulse">
+                  <div className="flex justify-between items-center">
+                    <div className="h-10 w-10 bg-gray-200 rounded-lg"></div>
+                    <div className="h-5 bg-gray-200 rounded-md w-16"></div>
+                  </div>
+                  <div className="h-5 bg-gray-200 rounded-md w-3/4"></div>
+                  <div className="space-y-2">
+                    <div className="h-3 bg-gray-100 rounded-md w-full"></div>
+                    <div className="h-3 bg-gray-100 rounded-md w-5/6"></div>
+                  </div>
+                  <div className="pt-4 border-t border-gray-100 space-y-2">
+                    <div className="h-3 bg-gray-100 rounded-md w-1/2"></div>
+                    <div className="h-3 bg-gray-100 rounded-md w-2/3"></div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 
@@ -224,10 +350,17 @@ function Home() {
 
           {/* LISTA DE PUNTOS */}
           {!cargando && !error && puntos.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            <motion.div
+              variants={contenedorVariantes}
+              initial="oculto"
+              animate="visible"
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8"
+            >
               {puntos.map((punto) => (
-                <div
-                  className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between"
+                <motion.div
+                  variants={elementoVariantes}
+                  whileHover={prefiereReducido ? {} : { y: -4, scale: 1.01 }}
+                  className="bg-white border border-gray-100 rounded-2xl p-6 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between"
                   key={punto.id}
                 >
                   <div>
@@ -254,9 +387,9 @@ function Home() {
                       <span className="font-semibold">{punto.localidad}</span>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           )}
         </div>
       </section>
@@ -265,3 +398,4 @@ function Home() {
 }
 
 export default Home
+export { TextoAnimado }
