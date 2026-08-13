@@ -1,4 +1,49 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+
+// =========================================================
+// COMPONENTE DE CONTEO ANIMADO DE NÚMEROS (CountUp)
+// =========================================================
+function ContadorAnimado({ valor, duracion = 1 }) {
+  const [conteo, setConteo] = useState(0)
+  const inicioRef = useRef(null)
+  const prefiereReducido = useReducedMotion()
+
+  useEffect(() => {
+    if (prefiereReducido) {
+      setConteo(valor)
+      return
+    }
+
+    let idAnimacion
+    const inicio = conteo // Empezar desde el conteo actual
+
+    const animar = (marcaTiempo) => {
+      if (!inicioRef.current) inicioRef.current = marcaTiempo
+      const progreso = marcaTiempo - inicioRef.current
+      const fraccion = Math.min(progreso / (duracion * 1000), 1)
+
+      // Función de easing out cuadratica
+      const easingOut = 1 - (1 - fraccion) * (1 - fraccion)
+      const valorActual = Math.floor(inicio + (valor - inicio) * easingOut)
+
+      setConteo(valorActual)
+
+      if (fraccion < 1) {
+        idAnimacion = requestAnimationFrame(animar)
+      }
+    }
+
+    idAnimacion = requestAnimationFrame(animar)
+    return () => {
+      cancelAnimationFrame(idAnimacion)
+      inicioRef.current = null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [valor, duracion, prefiereReducido])
+
+  return <span>{conteo}</span>
+}
 
 function Admin() {
   const [puntosPendientes, setPuntosPendientes] = useState([])
@@ -9,6 +54,9 @@ function Admin() {
   const [mensaje, setMensaje] = useState('')
   const [error, setError] = useState('')
   const [procesando, setProcesando] = useState(null)
+  const [pestañaActiva, setPestañaActiva] = useState('resumen') // 'resumen' o 'pendientes'
+
+  const prefiereReducido = useReducedMotion()
 
   const cargarDatosDashboard = async () => {
     const token = localStorage.getItem('access_token')
@@ -112,7 +160,6 @@ function Admin() {
 
       if (accion === 'aprobar') {
         setMensaje('Punto aprobado correctamente')
-        // Si se aprueba, lo agregamos a los puntos aprobados y lo quitamos de pendientes
         if (datos) {
           setPuntosAprobados((prev) => [...prev, datos])
         }
@@ -141,223 +188,430 @@ function Admin() {
   const porcentajeAprobados = totalPuntos > 0 ? Math.round((totalAprobados / totalPuntos) * 100) : 0
   const porcentajePendientes = totalPuntos > 0 ? Math.round((totalPendientes / totalPuntos) * 100) : 0
 
+  // Framer Motion Variants para transiciones fluidas y stagger
+  const contenedorVariantes = {
+    oculto: {},
+    visible: {
+      transition: {
+        staggerChildren: prefiereReducido ? 0 : 0.08
+      }
+    }
+  }
+
+  const elementoVariantes = {
+    oculto: { opacity: 0, y: prefiereReducido ? 0 : 15 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { type: 'spring', stiffness: 100, damping: 15 }
+    },
+    salida: {
+      opacity: 0,
+      x: prefiereReducido ? 0 : -30,
+      scale: prefiereReducido ? 1 : 0.95,
+      transition: { duration: 0.25, ease: 'easeInOut' }
+    }
+  }
+
+  const tabVariantes = {
+    oculto: { opacity: 0, x: prefiereReducido ? 0 : 15 },
+    visible: { opacity: 1, x: 0, transition: { duration: 0.3, ease: 'easeOut' } },
+    salida: { opacity: 0, x: prefiereReducido ? 0 : -15, transition: { duration: 0.2, ease: 'easeIn' } }
+  }
+
   return (
-    <div className="min-h-screen bg-[#f1f8f4] text-[#333333] font-sans">
-      {/* Header del Dashboard */}
-      <header className="bg-white border-b border-gray-100 py-6 px-4 sm:px-6 lg:px-8 shadow-xs">
+    <div className="min-h-screen bg-[#f1f8f4] text-[#333333] font-sans selection:bg-[#218739]/10 selection:text-[#176b2b]">
+      {/* Header del Dashboard con toque de Glassmorphism */}
+      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 py-5 px-4 sm:px-6 lg:px-8 shadow-xs">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-2xl">🌱</span>
-              <h1 className="text-2xl font-bold tracking-tight text-[#222222]">eco-TRACE</h1>
+              <motion.span
+                className="text-2xl"
+                animate={prefiereReducido ? {} : { rotate: [0, 10, -10, 0] }}
+                transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
+              >
+                🌱
+              </motion.span>
+              <h1 className="text-2xl font-black tracking-tight bg-gradient-to-r from-[#218739] to-[#4caf68] bg-clip-text text-transparent">eco-TRACE</h1>
             </div>
-            <p className="text-sm text-gray-500 mt-1">Panel de Control y Administración General</p>
+            <p className="text-sm text-gray-500 mt-1 font-medium">Panel de Control y Administración General</p>
           </div>
-          <button
-            type="button"
-            onClick={cargarDatosDashboard}
-            className="self-start md:self-auto inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-[#218739] hover:bg-[#176b2b] rounded-lg shadow-sm transition-colors duration-150 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-[#218739]"
-          >
-            Actualizar datos
-          </button>
+
+          <div className="flex items-center gap-3">
+            {/* Contenedor de Pestañas con animación sutil */}
+            <div className="bg-gray-100 p-1 rounded-xl flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setPestañaActiva('resumen')}
+                className={`px-4 py-2 text-xs font-bold rounded-lg cursor-pointer transition-all duration-200 ${pestañaActiva === 'resumen' ? 'bg-white text-[#218739] shadow-xs' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                📊 Resumen
+              </button>
+              <button
+                type="button"
+                onClick={() => setPestañaActiva('pendientes')}
+                className={`px-4 py-2 text-xs font-bold rounded-lg cursor-pointer transition-all duration-200 flex items-center gap-1.5 ${pestañaActiva === 'pendientes' ? 'bg-white text-[#218739] shadow-xs' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                ⏳ Pendientes
+                {totalPendientes > 0 && (
+                  <span className="bg-[#218739] text-white text-[10px] px-1.5 py-0.5 rounded-full font-black animate-pulse">
+                    {totalPendientes}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            <motion.button
+              type="button"
+              whileHover={prefiereReducido ? {} : { scale: 1.02 }}
+              whileTap={prefiereReducido ? {} : { scale: 0.98 }}
+              onClick={cargarDatosDashboard}
+              className="inline-flex items-center justify-center px-4 py-2.5 text-xs font-bold text-white bg-gradient-to-r from-[#218739] to-[#1c7330] hover:from-[#176b2b] hover:to-[#125321] rounded-xl shadow-sm transition-all duration-150 cursor-pointer focus:outline-hidden"
+            >
+              🔄 Actualizar
+            </motion.button>
+          </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        {/* Mensajes de feedback */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border-l-4 border-[#d93025] rounded-r-lg text-sm text-[#d93025] flex items-center gap-2">
-            <span className="font-semibold">Error:</span> {error}
-          </div>
-        )}
+        {/* Mensajes de feedback animados */}
+        <AnimatePresence mode="popLayout">
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mb-6 p-4 bg-red-50 border-l-4 border-[#d93025] rounded-r-2xl text-xs font-semibold text-[#d93025] flex items-center gap-2"
+            >
+              <span className="text-sm">⚠️</span> {error}
+            </motion.div>
+          )}
 
-        {mensaje && (
-          <div className="mb-6 p-4 bg-green-50 border-l-4 border-[#218739] rounded-r-lg text-sm text-[#218739] flex items-center gap-2">
-            <span className="font-semibold">Éxito:</span> {mensaje}
-          </div>
-        )}
+          {mensaje && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mb-6 p-4 bg-green-50 border-l-4 border-[#218739] rounded-r-2xl text-xs font-semibold text-[#218739] flex items-center gap-2"
+            >
+              <span className="text-sm">🎉</span> {mensaje}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {/* Sección de Métricas */}
-        <section className="mb-8">
-          <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span>📊</span> Resumen del Sistema
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {/* Tarjeta 1: Usuarios */}
-            <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-200">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-500">Usuarios Registrados</span>
-                <span className="p-2 rounded-lg bg-blue-50 text-blue-600 text-lg">👥</span>
-              </div>
-              <div className="mt-4">
-                <p className="text-3xl font-extrabold text-[#222222]">{cargando ? '...' : totalUsuarios}</p>
-                <p className="text-xs text-gray-400 mt-1">Ciudadanos activos</p>
-              </div>
-            </div>
+        {/* CONTENIDO INTERACTIVO DE LAS PESTAÑAS */}
+        <AnimatePresence mode="wait">
+          {pestañaActiva === 'resumen' ? (
+            <motion.div
+              key="resumen"
+              variants={tabVariantes}
+              initial="oculto"
+              animate="visible"
+              exit="salida"
+              className="space-y-8"
+            >
+              {/* Sección de Métricas con entrada stagger */}
+              <section>
+                <h2 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-4 flex items-center gap-2">
+                  <span>📈</span> Métricas Clave de la Plataforma
+                </h2>
 
-            {/* Tarjeta 2: Puntos Pendientes */}
-            <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-200">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-500">Puntos Pendientes</span>
-                <span className="p-2 rounded-lg bg-amber-50 text-amber-600 text-lg">⏳</span>
-              </div>
-              <div className="mt-4">
-                <p className="text-3xl font-extrabold text-[#222222]">{cargando ? '...' : totalPendientes}</p>
-                <p className="text-xs text-amber-600 font-medium mt-1">Requieren moderación</p>
-              </div>
-            </div>
-
-            {/* Tarjeta 3: Puntos Aprobados */}
-            <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-200">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-500">Puntos Aprobados</span>
-                <span className="p-2 rounded-lg bg-green-50 text-green-600 text-lg font-bold">✓</span>
-              </div>
-              <div className="mt-4">
-                <p className="text-3xl font-extrabold text-[#222222]">{cargando ? '...' : totalAprobados}</p>
-                <p className="text-xs text-green-600 font-medium mt-1">Visibles en el mapa</p>
-              </div>
-            </div>
-
-            {/* Tarjeta 4: Total */}
-            <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-200">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-500">Total de Puntos</span>
-                <span className="p-2 rounded-lg bg-gray-50 text-gray-600 text-lg">🌱</span>
-              </div>
-              <div className="mt-4">
-                <p className="text-3xl font-extrabold text-[#222222]">{cargando ? '...' : totalPuntos}</p>
-                <p className="text-xs text-gray-400 mt-1">Registrados en total</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Bloque de Comparación Visual Simple */}
-        <section className="mb-8">
-          <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Distribución de Puntos Ecológicos</h3>
-            {totalPuntos > 0 ? (
-              <div>
-                <div className="w-full bg-gray-100 h-4 rounded-full overflow-hidden flex">
-                  <div
-                    style={{ width: `${porcentajeAprobados}%` }}
-                    className="bg-[#218739] transition-all duration-500"
-                    title={`Aprobados: ${porcentajeAprobados}%`}
-                  ></div>
-                  <div
-                    style={{ width: `${porcentajePendientes}%` }}
-                    className="bg-amber-400 transition-all duration-500"
-                    title={`Pendientes: ${porcentajePendientes}%`}
-                  ></div>
-                </div>
-                <div className="flex justify-between items-center mt-3 text-xs text-gray-500">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#218739] inline-block"></span>
-                    <span>Aprobados: <strong>{totalAprobados}</strong> ({porcentajeAprobados}%)</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></span>
-                    <span>Pendientes: <strong>{totalPendientes}</strong> ({porcentajePendientes}%)</span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-gray-400 italic">No hay puntos ecológicos registrados todavía.</p>
-            )}
-          </div>
-        </section>
-
-        {/* Listado de Puntos Pendientes */}
-        <section>
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-              <div>
-                <h3 className="text-base font-bold text-gray-800">Puntos Pendientes de Verificación</h3>
-                <p className="text-xs text-gray-500 mt-1">Revisa detalladamente la información antes de aprobar o rechazar.</p>
-              </div>
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
-                {totalPendientes} por revisar
-              </span>
-            </div>
-
-            {cargando ? (
-              <div className="py-12 flex flex-col items-center justify-center gap-3">
-                <div className="w-8 h-8 border-4 border-[#218739]/30 border-t-[#218739] rounded-full animate-spin"></div>
-                <p className="text-sm text-gray-500 font-medium">Cargando puntos pendientes...</p>
-              </div>
-            ) : puntosPendientes.length === 0 ? (
-              <div className="py-16 text-center">
-                <span className="text-4xl">🎉</span>
-                <h4 className="text-lg font-bold text-gray-800 mt-4">¡Todo al día!</h4>
-                <p className="text-sm text-gray-500 mt-1 max-w-sm mx-auto">
-                  No hay puntos pendientes de verificación en este momento. Todos los envíos comunitarios han sido moderados.
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-100">
-                  <thead>
-                    <tr className="bg-gray-50/50 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                      <th className="px-6 py-4">Nombre y Tipo</th>
-                      <th className="px-6 py-4">Descripción</th>
-                      <th className="px-6 py-4">Ubicación / Coordenadas</th>
-                      <th className="px-6 py-4">Creado por</th>
-                      <th className="px-6 py-4 text-right">Acciones de moderación</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 bg-white">
-                    {puntosPendientes.map((punto) => (
-                      <tr key={punto.id} className="hover:bg-gray-50/30 transition-colors duration-150">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="font-bold text-gray-900 text-sm">{punto.nombre}</div>
-                          <span className="inline-block mt-1 px-2 py-0.5 text-[11px] font-bold tracking-wide rounded bg-[#f1f8f4] text-[#218739] border border-[#218739]/10 uppercase">
-                            {punto.tipo}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <p className="text-xs text-gray-600 max-w-xs line-clamp-2" title={punto.descripcion}>
-                            {punto.descripcion}
-                          </p>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-xs text-gray-900 font-semibold">{punto.direccion}</div>
-                          <div className="text-[11px] text-gray-500 mt-0.5">{punto.localidad}</div>
-                          <div className="text-[10px] text-gray-400 mt-1 font-mono">
-                            {punto.latitud.toFixed(5)}, {punto.longitud.toFixed(5)}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
-                          ID Usuario: <span className="font-semibold text-gray-700">{punto.usuario_id}</span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-xs font-medium">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              disabled={procesando === punto.id}
-                              onClick={() => cambiarEstado(punto.id, 'aprobar')}
-                              className="inline-flex items-center justify-center px-3 py-1.5 font-bold rounded-lg text-white bg-[#218739] hover:bg-[#176b2b] disabled:bg-gray-300 transition-colors duration-150 shadow-xs cursor-pointer"
-                            >
-                              {procesando === punto.id ? '...' : 'Aprobar'}
-                            </button>
-                            <button
-                              type="button"
-                              disabled={procesando === punto.id}
-                              onClick={() => cambiarEstado(punto.id, 'rechazar')}
-                              className="inline-flex items-center justify-center px-3 py-1.5 font-bold rounded-lg text-white bg-[#d93025] hover:bg-[#b3261e] disabled:bg-gray-300 transition-colors duration-150 shadow-xs cursor-pointer"
-                            >
-                              Rechazar
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
+                {cargando ? (
+                  /* SKELETON LOADER PARA METRICAS */
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                    {[1, 2, 3, 4].map((n) => (
+                      <div key={n} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-xs animate-pulse">
+                        <div className="flex justify-between items-center">
+                          <div className="h-4 bg-gray-200 rounded-md w-24"></div>
+                          <div className="h-8 w-8 bg-gray-200 rounded-lg"></div>
+                        </div>
+                        <div className="mt-4 space-y-2">
+                          <div className="h-8 bg-gray-200 rounded-md w-16"></div>
+                          <div className="h-3 bg-gray-100 rounded-md w-20"></div>
+                        </div>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+                ) : (
+                  <motion.div
+                    variants={contenedorVariantes}
+                    initial="oculto"
+                    animate="visible"
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5"
+                  >
+                    {/* Tarjeta 1: Usuarios */}
+                    <motion.div
+                      variants={elementoVariantes}
+                      whileHover={prefiereReducido ? {} : { y: -4, scale: 1.01 }}
+                      className="bg-white p-6 rounded-2xl border border-gray-50 shadow-xs hover:shadow-md transition-all duration-200"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">Usuarios</span>
+                        <span className="p-2.5 rounded-xl bg-blue-50 text-blue-600 text-sm">👥</span>
+                      </div>
+                      <div className="mt-4">
+                        <p className="text-3xl font-black text-[#222222]">
+                          <ContadorAnimado valor={totalUsuarios} />
+                        </p>
+                        <p className="text-[11px] text-gray-400 font-semibold mt-1">Ciudadanos registrados</p>
+                      </div>
+                    </motion.div>
+
+                    {/* Tarjeta 2: Puntos Pendientes */}
+                    <motion.div
+                      variants={elementoVariantes}
+                      whileHover={prefiereReducido ? {} : { y: -4, scale: 1.01 }}
+                      className="bg-white p-6 rounded-2xl border border-gray-50 shadow-xs hover:shadow-md transition-all duration-200"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">Pendientes</span>
+                        <span className="p-2.5 rounded-xl bg-amber-50 text-amber-600 text-sm">⏳</span>
+                      </div>
+                      <div className="mt-4">
+                        <p className="text-3xl font-black text-amber-500">
+                          <ContadorAnimado valor={totalPendientes} />
+                        </p>
+                        <p className="text-[11px] text-amber-600/80 font-bold mt-1">Requieren moderación</p>
+                      </div>
+                    </motion.div>
+
+                    {/* Tarjeta 3: Puntos Aprobados */}
+                    <motion.div
+                      variants={elementoVariantes}
+                      whileHover={prefiereReducido ? {} : { y: -4, scale: 1.01 }}
+                      className="bg-white p-6 rounded-2xl border border-gray-50 shadow-xs hover:shadow-md transition-all duration-200"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">Aprobados</span>
+                        <span className="p-2.5 rounded-xl bg-green-50 text-green-600 text-sm font-bold">✓</span>
+                      </div>
+                      <div className="mt-4">
+                        <p className="text-3xl font-black text-[#218739]">
+                          <ContadorAnimado valor={totalAprobados} />
+                        </p>
+                        <p className="text-[11px] text-green-600/80 font-bold mt-1">Visibles en el mapa</p>
+                      </div>
+                    </motion.div>
+
+                    {/* Tarjeta 4: Total */}
+                    <motion.div
+                      variants={elementoVariantes}
+                      whileHover={prefiereReducido ? {} : { y: -4, scale: 1.01 }}
+                      className="bg-white p-6 rounded-2xl border border-gray-50 shadow-xs hover:shadow-md transition-all duration-200"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">Total</span>
+                        <span className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 text-sm">🌱</span>
+                      </div>
+                      <div className="mt-4">
+                        <p className="text-3xl font-black text-[#222222]">
+                          <ContadorAnimado valor={totalPuntos} />
+                        </p>
+                        <p className="text-[11px] text-gray-400 font-semibold mt-1">Registrados totales</p>
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                )}
+              </section>
+
+              {/* Bloque de Comparación Visual con Crecimiento Animado */}
+              <section className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-50 shadow-xs">
+                <h3 className="text-sm font-bold text-gray-700 mb-4">Proporción de Estados de Puntos</h3>
+                {cargando ? (
+                  <div className="space-y-4 animate-pulse">
+                    <div className="h-4 bg-gray-200 rounded-full w-full"></div>
+                    <div className="flex justify-between w-full">
+                      <div className="h-3 bg-gray-200 rounded-md w-28"></div>
+                      <div className="h-3 bg-gray-200 rounded-md w-28"></div>
+                    </div>
+                  </div>
+                ) : totalPuntos > 0 ? (
+                  <div>
+                    {/* Barra de progreso con transiciones animadas */}
+                    <div className="w-full bg-gray-100 h-5 rounded-full overflow-hidden flex">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${porcentajeAprobados}%` }}
+                        transition={{ duration: 1, ease: 'easeOut' }}
+                        className="bg-gradient-to-r from-[#218739] to-[#4caf68]"
+                        title={`Aprobados: ${porcentajeAprobados}%`}
+                      ></motion.div>
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${porcentajePendientes}%` }}
+                        transition={{ duration: 1, ease: 'easeOut', delay: 0.1 }}
+                        className="bg-amber-400"
+                        title={`Pendientes: ${porcentajePendientes}%`}
+                      ></motion.div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mt-4 text-xs font-semibold text-gray-500">
+                      <div className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full bg-[#218739]"></span>
+                        <span>Aprobados: <strong className="text-gray-800">{totalAprobados}</strong> ({porcentajeAprobados}%)</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full bg-amber-400"></span>
+                        <span>Pendientes: <strong className="text-gray-800">{totalPendientes}</strong> ({porcentajePendientes}%)</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400 italic">No hay puntos ecológicos registrados todavía.</p>
+                )}
+              </section>
+
+              {/* Botón rápido para acceder al listado de pendientes */}
+              {totalPendientes > 0 && !cargando && (
+                <div className="flex justify-center pt-2">
+                  <motion.button
+                    type="button"
+                    whileHover={prefiereReducido ? {} : { scale: 1.02 }}
+                    whileTap={prefiereReducido ? {} : { scale: 0.98 }}
+                    onClick={() => setPestañaActiva('pendientes')}
+                    className="px-6 py-3 bg-[#218739]/10 hover:bg-[#218739]/15 text-[#218739] font-bold text-xs rounded-xl flex items-center gap-2 cursor-pointer transition-colors"
+                  >
+                    🔍 Ver puntos pendientes en lista ({totalPendientes})
+                  </motion.button>
+                </div>
+              )}
+            </motion.div>
+          ) : (
+            /* PESTAÑA: PUNTOS PENDIENTES */
+            <motion.div
+              key="pendientes"
+              variants={tabVariantes}
+              initial="oculto"
+              animate="visible"
+              exit="salida"
+              className="space-y-6"
+            >
+              <div className="bg-white rounded-3xl border border-gray-50 shadow-xs overflow-hidden">
+                <div className="px-6 py-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gray-50/30">
+                  <div>
+                    <h3 className="text-base font-extrabold text-gray-800">Verificación Comunitaria</h3>
+                    <p className="text-xs text-gray-500 mt-1">Revisa detalladamente la información antes de aprobar o rechazar un punto.</p>
+                  </div>
+                  <span className="self-start sm:self-auto inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                    ⚠️ {totalPendientes} pendientes
+                  </span>
+                </div>
+
+                {cargando ? (
+                  /* SKELETON ANIMADO DE TABLA */
+                  <div className="p-6 space-y-4">
+                    {[1, 2, 3].map((n) => (
+                      <div key={n} className="flex justify-between items-center gap-4 animate-pulse border-b border-gray-50 pb-4">
+                        <div className="space-y-2 flex-1">
+                          <div className="h-4 bg-gray-200 rounded-md w-1/4"></div>
+                          <div className="h-3 bg-gray-100 rounded-md w-1/2"></div>
+                        </div>
+                        <div className="flex gap-2">
+                          <div className="h-8 w-16 bg-gray-200 rounded-lg"></div>
+                          <div className="h-8 w-16 bg-gray-200 rounded-lg"></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : puntosPendientes.length === 0 ? (
+                  <motion.div
+                    initial={{ scale: 0.95, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="py-16 text-center"
+                  >
+                    <span className="text-4xl">🎉</span>
+                    <h4 className="text-lg font-bold text-gray-800 mt-4">¡Todo al día!</h4>
+                    <p className="text-sm text-gray-500 mt-1 max-w-sm mx-auto px-4">
+                      No hay puntos pendientes de verificación en este momento. Todos los envíos comunitarios han sido moderados de forma exitosa.
+                    </p>
+                  </motion.div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-100">
+                      <thead>
+                        <tr className="bg-gray-50/30 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">
+                          <th className="px-6 py-4">Punto ecológico</th>
+                          <th className="px-6 py-4">Descripción</th>
+                          <th className="px-6 py-4">Ubicación</th>
+                          <th className="px-6 py-4">Creador</th>
+                          <th className="px-6 py-4 text-right">Moderación</th>
+                        </tr>
+                      </thead>
+                      <motion.tbody
+                        variants={contenedorVariantes}
+                        initial="oculto"
+                        animate="visible"
+                        className="divide-y divide-gray-100 bg-white"
+                      >
+                        <AnimatePresence mode="popLayout">
+                          {puntosPendientes.map((punto) => (
+                            <motion.tr
+                              key={punto.id}
+                              variants={elementoVariantes}
+                              initial="oculto"
+                              animate="visible"
+                              exit="salida"
+                              layout={!prefiereReducido}
+                              className="hover:bg-gray-50/20 transition-colors duration-150"
+                            >
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="font-extrabold text-gray-900 text-sm">{punto.nombre}</div>
+                                <span className="inline-block mt-1.5 px-2.5 py-0.5 text-[10px] font-extrabold tracking-wider rounded-lg bg-[#f1f8f4] text-[#218739] border border-[#218739]/10 uppercase">
+                                  {punto.tipo}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <p className="text-xs text-gray-500 max-w-xs line-clamp-2" title={punto.descripcion}>
+                                  {punto.descripcion}
+                                </p>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="text-xs text-gray-800 font-bold">{punto.direccion}</div>
+                                <div className="text-[11px] text-gray-400 mt-0.5 font-semibold">{punto.localidad}</div>
+                                <div className="text-[10px] text-gray-400 mt-1 font-mono">
+                                  {punto.latitud.toFixed(5)}, {punto.longitud.toFixed(5)}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-gray-500">
+                                ID {punto.usuario_id}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-right text-xs">
+                                <div className="flex items-center justify-end gap-2">
+                                  <motion.button
+                                    type="button"
+                                    whileHover={prefiereReducido ? {} : { scale: 1.05 }}
+                                    whileTap={prefiereReducido ? {} : { scale: 0.95 }}
+                                    disabled={procesando === punto.id}
+                                    onClick={() => cambiarEstado(punto.id, 'aprobar')}
+                                    className="inline-flex items-center justify-center px-4.5 py-2 font-bold rounded-xl text-white bg-gradient-to-r from-[#218739] to-[#39aa53] hover:from-[#176b2b] hover:to-[#2b833e] disabled:from-gray-300 disabled:to-gray-300 shadow-xs cursor-pointer focus:outline-hidden"
+                                  >
+                                    {procesando === punto.id ? '...' : 'Aprobar'}
+                                  </motion.button>
+                                  <motion.button
+                                    type="button"
+                                    whileHover={prefiereReducido ? {} : { scale: 1.05 }}
+                                    whileTap={prefiereReducido ? {} : { scale: 0.95 }}
+                                    disabled={procesando === punto.id}
+                                    onClick={() => cambiarEstado(punto.id, 'rechazar')}
+                                    className="inline-flex items-center justify-center px-4.5 py-2 font-bold rounded-xl text-white bg-gradient-to-r from-[#d93025] to-[#f44336] hover:from-[#b3261e] hover:to-[#d32f2f] disabled:from-gray-300 disabled:to-gray-300 shadow-xs cursor-pointer focus:outline-hidden"
+                                  >
+                                    Rechazar
+                                  </motion.button>
+                                </div>
+                              </td>
+                            </motion.tr>
+                          ))}
+                        </AnimatePresence>
+                      </motion.tbody>
+                    </table>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </section>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
     </div>
   )
