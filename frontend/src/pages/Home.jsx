@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 
 // =========================================================
-// COMPONENTE PARA ANIMAR TEXTO CARÁCTER POR CARÁCTER
+// COMPONENTE REUTILIZABLE PARA ANIMAR TEXTO CARÁCTER POR CARÁCTER
 // =========================================================
 function TextoAnimado({ texto }) {
   const prefiereReducido = useReducedMotion()
@@ -112,9 +112,9 @@ function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f1f8f4] font-sans text-[#333333]">
+    <div className="min-h-screen bg-[#f1f8f4] dark:bg-[#0f1512] font-sans text-[#333333] dark:text-[#f2f5f3] transition-colors duration-300">
       {/* HERO SECTION LLAMATIVA */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-[#218739] via-[#1b7230] to-[#125321] text-white py-24 px-4 sm:px-6 lg:px-8 shadow-inner">
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#218739] via-[#1b7230] to-[#125321] dark:from-[#1a2320] dark:via-[#121c18] dark:to-[#0f1512] text-white py-24 px-4 sm:px-6 lg:px-8 shadow-inner">
         {/* Elemento decorativo flotante */}
         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-80 h-80 rounded-full bg-white/5 blur-3xl pointer-events-none"></div>
         <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 rounded-full bg-black/10 blur-3xl pointer-events-none"></div>
@@ -125,15 +125,14 @@ function Home() {
           </div>
 
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight mb-6">
-            <TextoAnimado texto="Conecta, Recicla y Transforma con " />
-            <span className="text-[#a5f3fc]">eco-TRACE</span>
+            <TextoAnimado texto="Bienvenido a eco-TRACE 🌱" />
           </h1>
 
           <motion.p
             initial={{ opacity: 0, y: prefiereReducido ? 0 : 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5, duration: 0.5 }}
-            className="text-lg sm:text-xl text-emerald-100/90 max-w-2xl mx-auto mb-10 leading-relaxed"
+            className="text-lg sm:text-xl text-emerald-100/90 dark:text-[#a8b3ae] max-w-2xl mx-auto mb-10 leading-relaxed"
           >
             La red comunitaria de puntos ecológicos verificados. Encuentra, registra y valida lugares de reciclaje, donación de ropa y desecho electrónico en tu ciudad.
           </motion.p>
@@ -148,7 +147,7 @@ function Home() {
               whileHover={prefiereReducido ? {} : { scale: 1.03 }}
               whileTap={prefiereReducido ? {} : { scale: 0.97 }}
               onClick={() => navigate('/mapa')}
-              className="px-8 py-3.5 bg-white text-[#218739] hover:bg-emerald-50 text-sm font-bold rounded-xl shadow-md hover:shadow-lg transition-all duration-150 cursor-pointer"
+              className="px-8 py-3.5 bg-white dark:bg-[#2fa350] text-[#218739] dark:text-white hover:bg-emerald-50 dark:hover:bg-[#218739] text-sm font-bold rounded-xl shadow-md hover:shadow-lg transition-all duration-150 cursor-pointer"
             >
               Explorar el Mapa
             </motion.button>
@@ -170,24 +169,24 @@ function Home() {
           initial={{ opacity: 0, scale: prefiereReducido ? 1 : 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.8, type: 'spring', stiffness: 100, damping: 15 }}
-          className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 sm:p-8 grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 divide-y sm:divide-y-0 sm:divide-x divide-gray-100"
+          className="bg-white dark:bg-[#1a2320] rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800/40 p-6 sm:p-8 grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 divide-y sm:divide-y-0 sm:divide-x divide-gray-100 dark:divide-gray-800/40"
         >
           <div className="text-center sm:pb-0 pb-6">
-            <div className="text-3xl sm:text-4xl font-extrabold text-[#218739] mb-1">
+            <div className="text-3xl sm:text-4xl font-extrabold text-[#218739] dark:text-[#2fa350] mb-1">
               {cargando ? '...' : puntos.length}
             </div>
-            <div className="text-sm font-bold text-gray-700">Puntos Verificados</div>
-            <p className="text-xs text-gray-400 mt-1 max-w-xs mx-auto">Centros de acopio y donación listos para recibir tus residuos.</p>
+            <div className="text-sm font-bold text-gray-700 dark:text-[#f2f5f3]">Puntos Verificados</div>
+            <p className="text-xs text-gray-400 dark:text-[#a8b3ae] mt-1 max-w-xs mx-auto">Centros de acopio y donación listos para recibir tus residuos.</p>
           </div>
           <div className="text-center pt-6 sm:pt-0 sm:pb-0 pb-6">
-            <div className="text-3xl sm:text-4xl font-extrabold text-blue-600 mb-1">100%</div>
-            <div className="text-sm font-bold text-gray-700">Confianza Comunitaria</div>
-            <p className="text-xs text-gray-400 mt-1 max-w-xs mx-auto">Toda la información es validada por un equipo de moderadores autorizados.</p>
+            <div className="text-3xl sm:text-4xl font-extrabold text-blue-600 dark:text-blue-400 mb-1">100%</div>
+            <div className="text-sm font-bold text-gray-700 dark:text-[#f2f5f3]">Confianza Comunitaria</div>
+            <p className="text-xs text-gray-400 dark:text-[#a8b3ae] mt-1 max-w-xs mx-auto">Toda la información es validada por un equipo de moderadores autorizados.</p>
           </div>
           <div className="text-center pt-6 sm:pt-0">
-            <div className="text-3xl sm:text-4xl font-extrabold text-amber-500 mb-1">3+</div>
-            <div className="text-sm font-bold text-gray-700">Categorías de Residuos</div>
-            <p className="text-xs text-gray-400 mt-1 max-w-xs mx-auto">Clasificados en reciclables tradicionales, ropa y residuos electrónicos.</p>
+            <div className="text-3xl sm:text-4xl font-extrabold text-amber-500 dark:text-amber-400 mb-1">3+</div>
+            <div className="text-sm font-bold text-gray-700 dark:text-[#f2f5f3]">Categorías de Residuos</div>
+            <p className="text-xs text-gray-400 dark:text-[#a8b3ae] mt-1 max-w-xs mx-auto">Clasificados en reciclables tradicionales, ropa y residuos electrónicos.</p>
           </div>
         </motion.div>
       </section>
@@ -195,8 +194,8 @@ function Home() {
       {/* SECCIÓN DE OPCIONES Y ACCIONES CON ENTRADA ESCALONADA (STAGGER) */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-20">
         <div className="text-center mb-12">
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900">¿Qué deseas hacer hoy?</h2>
-          <p className="text-sm text-gray-500 mt-2">Interactúa con la plataforma y sé parte del cambio ecológico.</p>
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white">¿Qué deseas hacer hoy?</h2>
+          <p className="text-sm text-gray-500 dark:text-[#a8b3ae] mt-2">Interactúa con la plataforma y sé parte del cambio ecológico.</p>
         </div>
 
         <motion.div
@@ -209,20 +208,20 @@ function Home() {
           <motion.div
             variants={elementoVariantes}
             whileHover={prefiereReducido ? {} : { y: -5, scale: 1.02 }}
-            className="bg-white p-8 rounded-2xl border border-gray-100 shadow-xs hover:shadow-lg transition-all duration-200 flex flex-col justify-between group"
+            className="bg-white dark:bg-[#1a2320] p-8 rounded-2xl border border-gray-100 dark:border-gray-800/40 shadow-xs hover:shadow-lg transition-all duration-200 flex flex-col justify-between group"
           >
             <div>
-              <div className="w-14 h-14 rounded-xl bg-green-50 flex items-center justify-center text-3xl mb-6 group-hover:scale-110 transition-transform duration-200">
+              <div className="w-14 h-14 rounded-xl bg-green-50 dark:bg-green-950/20 flex items-center justify-center text-3xl mb-6 group-hover:scale-110 transition-transform duration-200">
                 🗺️
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Explorar el Mapa</h3>
-              <p className="text-sm text-gray-500 leading-relaxed mb-6">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-[#f2f5f3] mb-3">Explorar el Mapa</h3>
+              <p className="text-sm text-gray-500 dark:text-[#a8b3ae] leading-relaxed mb-6">
                 Descubre de forma visual todos los puntos de acopio autorizados más cercanos a tu ubicación. Filtra por tipo de material.
               </p>
             </div>
             <button
               onClick={() => navigate('/mapa')}
-              className="w-full py-3 bg-[#218739] hover:bg-[#176b2b] text-white text-sm font-bold rounded-xl shadow-xs hover:shadow-md transition-colors duration-150 cursor-pointer"
+              className="w-full py-3 bg-[#218739] dark:bg-[#2fa350] hover:bg-[#176b2b] dark:hover:bg-[#218739] text-white text-sm font-bold rounded-xl shadow-xs hover:shadow-md transition-colors duration-150 cursor-pointer"
             >
               Ver mapa interactivo
             </button>
@@ -232,20 +231,20 @@ function Home() {
           <motion.div
             variants={elementoVariantes}
             whileHover={prefiereReducido ? {} : { y: -5, scale: 1.02 }}
-            className="bg-white p-8 rounded-2xl border border-gray-100 shadow-xs hover:shadow-lg transition-all duration-200 flex flex-col justify-between group"
+            className="bg-white dark:bg-[#1a2320] p-8 rounded-2xl border border-gray-100 dark:border-gray-800/40 shadow-xs hover:shadow-lg transition-all duration-200 flex flex-col justify-between group"
           >
             <div>
-              <div className="w-14 h-14 rounded-xl bg-emerald-50 flex items-center justify-center text-3xl mb-6 group-hover:scale-110 transition-transform duration-200">
+              <div className="w-14 h-14 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 flex items-center justify-center text-3xl mb-6 group-hover:scale-110 transition-transform duration-200">
                 ➕
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Agregar Nuevo Punto</h3>
-              <p className="text-sm text-gray-500 leading-relaxed mb-6">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-[#f2f5f3] mb-3">Agregar Nuevo Punto</h3>
+              <p className="text-sm text-gray-500 dark:text-[#a8b3ae] leading-relaxed mb-6">
                 ¿Conoces un punto de reciclaje que no está registrado? Regístralo en unos simples pasos para que los administradores lo verifiquen.
               </p>
             </div>
             <button
               onClick={() => navigate('/agregar-punto')}
-              className="w-full py-3 bg-white hover:bg-gray-50 text-[#218739] border border-gray-200 text-sm font-bold rounded-xl shadow-xs hover:shadow-md transition-all duration-150 cursor-pointer"
+              className="w-full py-3 bg-white dark:bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800/20 text-[#218739] dark:text-[#2fa350] border border-gray-200 dark:border-gray-800/30 text-sm font-bold rounded-xl shadow-xs hover:shadow-md transition-all duration-150 cursor-pointer"
             >
               Registrar punto ecológico
             </button>
@@ -255,20 +254,20 @@ function Home() {
           <motion.div
             variants={elementoVariantes}
             whileHover={prefiereReducido ? {} : { y: -5, scale: 1.02 }}
-            className="bg-white p-8 rounded-2xl border border-gray-100 shadow-xs hover:shadow-lg transition-all duration-200 flex flex-col justify-between group"
+            className="bg-white dark:bg-[#1a2320] p-8 rounded-2xl border border-gray-100 dark:border-gray-800/40 shadow-xs hover:shadow-lg transition-all duration-200 flex flex-col justify-between group"
           >
             <div>
-              <div className="w-14 h-14 rounded-xl bg-teal-50 flex items-center justify-center text-3xl mb-6 group-hover:scale-110 transition-transform duration-200">
+              <div className="w-14 h-14 rounded-xl bg-teal-50 dark:bg-teal-950/20 flex items-center justify-center text-3xl mb-6 group-hover:scale-110 transition-transform duration-200">
                 ♻️
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Aprender y Clasificar</h3>
-              <p className="text-sm text-gray-500 leading-relaxed mb-6">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-[#f2f5f3] mb-3">Aprender y Clasificar</h3>
+              <p className="text-sm text-gray-500 dark:text-[#a8b3ae] leading-relaxed mb-6">
                 Consulta los diferentes tipos de materiales admitidos y aprende guías rápidas de clasificación para maximizar tu impacto positivo.
               </p>
             </div>
             <button
               onClick={() => navigate('/mapa')}
-              className="w-full py-3 bg-white hover:bg-gray-50 text-[#218739] border border-gray-200 text-sm font-bold rounded-xl shadow-xs hover:shadow-md transition-all duration-150 cursor-pointer"
+              className="w-full py-3 bg-white dark:bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800/20 text-[#218739] dark:text-[#2fa350] border border-gray-200 dark:border-gray-800/30 text-sm font-bold rounded-xl shadow-xs hover:shadow-md transition-all duration-150 cursor-pointer"
             >
               Guía de materiales
             </button>
@@ -278,13 +277,13 @@ function Home() {
           {esAdmin && (
             <motion.div
               variants={elementoVariantes}
-              className="sm:col-span-2 lg:col-span-3 bg-amber-50/50 border border-amber-200 rounded-2xl p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 shadow-xs"
+              className="sm:col-span-2 lg:col-span-3 bg-amber-50/50 dark:bg-amber-950/10 border border-amber-200 dark:border-amber-900/30 rounded-2xl p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 shadow-xs"
             >
               <div className="flex gap-4 items-start">
-                <div className="text-3xl p-3 bg-amber-100 rounded-xl">🛡️</div>
+                <div className="text-3xl p-3 bg-amber-100 dark:bg-amber-900/20 rounded-xl">🛡️</div>
                 <div>
-                  <h3 className="text-lg font-bold text-amber-900">Módulo de Moderación Activado</h3>
-                  <p className="text-sm text-amber-800 mt-1 max-w-xl">
+                  <h3 className="text-lg font-bold text-amber-900 dark:text-amber-400">Módulo de Moderación Activado</h3>
+                  <p className="text-sm text-amber-800 dark:text-amber-300 mt-1 max-w-xl">
                     Tienes permisos de administrador. Tienes solicitudes pendientes enviadas por la comunidad que requieren tu supervisión.
                   </p>
                 </div>
@@ -303,30 +302,30 @@ function Home() {
       </section>
 
       {/* LISTADO DE PUNTOS DISPONIBLES (APROBADOS) CON SKELETON */}
-      <section className="bg-white border-t border-gray-100 py-20 px-4 sm:px-6 lg:px-8">
+      <section className="bg-white dark:bg-[#121816] border-t border-gray-100 dark:border-gray-850 py-20 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-14">
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900">Puntos Ecológicos Destacados</h2>
-            <p className="text-sm text-gray-500 mt-2">Ubicaciones activas y completamente validadas dentro de la ciudad.</p>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white">Puntos Ecológicos Destacados</h2>
+            <p className="text-sm text-gray-500 dark:text-[#a8b3ae] mt-2">Ubicaciones activas y completamente validadas dentro de la ciudad.</p>
           </div>
 
           {/* CARGANDO CON SKELETON LOADERS */}
           {cargando && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
               {[1, 2, 3].map((n) => (
-                <div key={n} className="bg-white border border-gray-100 rounded-2xl p-6 shadow-xs space-y-4 animate-pulse">
+                <div key={n} className="bg-white dark:bg-[#1a2320] border border-gray-100 dark:border-gray-800/40 rounded-2xl p-6 shadow-xs space-y-4 animate-pulse">
                   <div className="flex justify-between items-center">
-                    <div className="h-10 w-10 bg-gray-200 rounded-lg"></div>
-                    <div className="h-5 bg-gray-200 rounded-md w-16"></div>
+                    <div className="h-10 w-10 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+                    <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded-md w-16"></div>
                   </div>
-                  <div className="h-5 bg-gray-200 rounded-md w-3/4"></div>
+                  <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded-md w-3/4"></div>
                   <div className="space-y-2">
-                    <div className="h-3 bg-gray-100 rounded-md w-full"></div>
-                    <div className="h-3 bg-gray-100 rounded-md w-5/6"></div>
+                    <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded-md w-full"></div>
+                    <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded-md w-5/6"></div>
                   </div>
-                  <div className="pt-4 border-t border-gray-100 space-y-2">
-                    <div className="h-3 bg-gray-100 rounded-md w-1/2"></div>
-                    <div className="h-3 bg-gray-100 rounded-md w-2/3"></div>
+                  <div className="pt-4 border-t border-gray-100 dark:border-gray-800/30 space-y-2">
+                    <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded-md w-1/2"></div>
+                    <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded-md w-2/3"></div>
                   </div>
                 </div>
               ))}
@@ -360,31 +359,31 @@ function Home() {
                 <motion.div
                   variants={elementoVariantes}
                   whileHover={prefiereReducido ? {} : { y: -4, scale: 1.01 }}
-                  className="bg-white border border-gray-100 rounded-2xl p-6 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between"
+                  className="bg-white dark:bg-[#1a2320] border border-gray-100 dark:border-gray-800/40 rounded-2xl p-6 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between"
                   key={punto.id}
                 >
                   <div>
                     <div className="flex justify-between items-start gap-4 mb-4">
-                      <div className="p-2.5 bg-[#f1f8f4] rounded-lg text-xl">
+                      <div className="p-2.5 bg-[#f1f8f4] dark:bg-[#0f1512] rounded-lg text-xl">
                         {punto.tipo.toLowerCase().includes('electr') ? '🔌' : punto.tipo.toLowerCase().includes('ropa') ? '👕' : '♻️'}
                       </div>
-                      <span className="px-2.5 py-0.5 text-[11px] font-bold uppercase rounded bg-[#f1f8f4] text-[#218739] border border-[#218739]/10">
+                      <span className="px-2.5 py-0.5 text-[11px] font-bold uppercase rounded bg-[#f1f8f4] dark:bg-[#0f1512] text-[#218739] dark:text-[#2fa350] border border-[#218739]/10 dark:border-transparent">
                         {punto.tipo}
                       </span>
                     </div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">{punto.nombre}</h3>
-                    <p className="text-xs text-gray-500 line-clamp-3 leading-relaxed mb-6" title={punto.descripcion}>
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-[#f2f5f3] mb-2">{punto.nombre}</h3>
+                    <p className="text-xs text-gray-500 dark:text-[#a8b3ae] line-clamp-3 leading-relaxed mb-6" title={punto.descripcion}>
                       {punto.descripcion}
                     </p>
                   </div>
-                  <div className="pt-4 border-t border-gray-100 space-y-1.5 text-xs text-gray-600">
+                  <div className="pt-4 border-t border-gray-100 dark:border-gray-800/30 space-y-1.5 text-xs text-gray-600 dark:text-[#a8b3ae]">
                     <div className="flex items-start gap-2">
                       <span className="text-gray-400 font-medium shrink-0">📍 Dir:</span>
-                      <span className="font-semibold">{punto.direccion}</span>
+                      <span className="font-semibold text-gray-800 dark:text-[#f2f5f3]">{punto.direccion}</span>
                     </div>
                     <div className="flex items-start gap-2">
                       <span className="text-gray-400 font-medium shrink-0">🏙️ Loc:</span>
-                      <span className="font-semibold">{punto.localidad}</span>
+                      <span className="font-semibold text-gray-800 dark:text-[#f2f5f3]">{punto.localidad}</span>
                     </div>
                   </div>
                 </motion.div>
