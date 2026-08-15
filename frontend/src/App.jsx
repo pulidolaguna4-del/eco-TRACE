@@ -9,6 +9,7 @@ import Home from './pages/Home'
 import Mapa from './pages/Mapa'
 import Perfil from './pages/Perfil'
 import Admin from './pages/Admin'
+import MisPuntos from './pages/MisPuntos'
 
 function AppContent() {
   const location = useLocation()
@@ -59,10 +60,15 @@ function AppContent() {
           element={<Mapa />}
         />
 
-        {/* PERFIL */}
+        {/* PERFIL Y MIS PUNTOS */}
         <Route
           path="/perfil"
           element={<Perfil />}
+        />
+
+        <Route
+          path="/mis-puntos"
+          element={<MisPuntos />}
         />
 
         {/* ADMINISTRADOR */}
@@ -81,4 +87,3 @@ function App() {
 }
 
 export default App
-
