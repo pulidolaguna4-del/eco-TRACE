@@ -1,4 +1,5 @@
 from typing import Optional
+from datetime import datetime
 
 from sqlmodel import Field, SQLModel
 
@@ -8,6 +9,7 @@ from sqlmodel import Field, SQLModel
 # =========================================================
 
 class Usuario(SQLModel, table=True):
+
     __tablename__ = "usuarios"
 
     id: Optional[int] = Field(
@@ -35,6 +37,7 @@ class Usuario(SQLModel, table=True):
 # =========================================================
 
 class UsuarioRegistro(SQLModel):
+
     nombre: str
     correo: str
     password: str
@@ -45,6 +48,7 @@ class UsuarioRegistro(SQLModel):
 # =========================================================
 
 class UsuarioRespuesta(SQLModel):
+
     id: int
     nombre: str
     correo: str
@@ -56,6 +60,7 @@ class UsuarioRespuesta(SQLModel):
 # =========================================================
 
 class UsuarioActualizar(SQLModel):
+
     nombre: str
     correo: str
 
@@ -65,6 +70,7 @@ class UsuarioActualizar(SQLModel):
 # =========================================================
 
 class UsuarioLogin(SQLModel):
+
     correo: str
     password: str
 
@@ -74,6 +80,7 @@ class UsuarioLogin(SQLModel):
 # =========================================================
 
 class TokenRespuesta(SQLModel):
+
     access_token: str
     token_type: str
     usuario: UsuarioRespuesta
@@ -84,6 +91,7 @@ class TokenRespuesta(SQLModel):
 # =========================================================
 
 class Punto(SQLModel, table=True):
+
     __tablename__ = "puntos"
 
     id: Optional[int] = Field(
@@ -92,12 +100,17 @@ class Punto(SQLModel, table=True):
     )
 
     nombre: str
+
     descripcion: str
+
     direccion: str
+
     localidad: str
+
     tipo: str
 
     latitud: float
+
     longitud: float
 
     estado: str = Field(
@@ -114,12 +127,19 @@ class Punto(SQLModel, table=True):
 # =========================================================
 
 class PuntoRegistro(SQLModel):
+
     nombre: str
+
     descripcion: str
+
     direccion: str
+
     localidad: str
+
     tipo: str
+
     latitud: float
+
     longitud: float
 
 
@@ -128,16 +148,110 @@ class PuntoRegistro(SQLModel):
 # =========================================================
 
 class PuntoRespuesta(SQLModel):
+
     id: int
+
     nombre: str
+
     descripcion: str
+
     direccion: str
+
     localidad: str
+
     tipo: str
+
     latitud: float
+
     longitud: float
+
     estado: str
+
     usuario_id: int
+
+
+# =========================================================
+# ENTREGA / DONACIÓN / RECICLAJE
+# =========================================================
+
+class Entrega(SQLModel, table=True):
+
+    __tablename__ = "entregas"
+
+    id: Optional[int] = Field(
+        default=None,
+        primary_key=True
+    )
+
+    # Usuario que realizó la entrega
+    usuario_id: int = Field(
+        foreign_key="usuarios.id"
+    )
+
+    # Punto ecológico donde se realizó la entrega
+    punto_id: int = Field(
+        foreign_key="puntos.id"
+    )
+
+    # Tipo de entrega:
+    # ropa, reciclaje, reciclaje electrónico, etc.
+    tipo: str
+
+    # Cantidad entregada
+    cantidad: float
+
+    # Unidad de medida:
+    # kg, unidades, prendas, etc.
+    unidad: str
+
+    # Fecha y hora en que se registró
+    fecha: datetime = Field(
+        default_factory=datetime.now
+    )
+
+    # Estado de la entrega
+    # registrada, confirmada, cancelada
+    estado: str = Field(
+        default="registrada"
+    )
+
+
+# =========================================================
+# REGISTRO DE ENTREGA
+# =========================================================
+
+class EntregaRegistro(SQLModel):
+
+    punto_id: int
+
+    tipo: str
+
+    cantidad: float
+
+    unidad: str
+
+
+# =========================================================
+# RESPUESTA DE ENTREGA
+# =========================================================
+
+class EntregaRespuesta(SQLModel):
+
+    id: int
+
+    usuario_id: int
+
+    punto_id: int
+
+    tipo: str
+
+    cantidad: float
+
+    unidad: str
+
+    fecha: datetime
+
+    estado: str
 
 
 # =========================================================
@@ -145,6 +259,7 @@ class PuntoRespuesta(SQLModel):
 # =========================================================
 
 class CodigoRecuperacion(SQLModel, table=True):
+
     __tablename__ = "codigos_recuperacion"
 
     id: Optional[int] = Field(
@@ -170,6 +285,7 @@ class CodigoRecuperacion(SQLModel, table=True):
 # =========================================================
 
 class SolicitarRecuperacion(SQLModel):
+
     correo: str
 
 
@@ -178,7 +294,9 @@ class SolicitarRecuperacion(SQLModel):
 # =========================================================
 
 class VerificarCodigo(SQLModel):
+
     correo: str
+
     codigo: str
 
 
@@ -187,6 +305,9 @@ class VerificarCodigo(SQLModel):
 # =========================================================
 
 class NuevaContrasena(SQLModel):
+
     correo: str
+
     codigo: str
+
     nueva_password: str

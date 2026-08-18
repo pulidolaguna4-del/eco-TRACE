@@ -9,6 +9,7 @@ import Home from './pages/Home'
 import Mapa from './pages/Mapa'
 import Perfil from './pages/Perfil'
 import Admin from './pages/Admin'
+import Historial from './pages/Historial'
 
 function AppContent() {
   const location = useLocation()
@@ -65,6 +66,12 @@ function AppContent() {
           element={<Perfil />}
         />
 
+        {/* HISTORIAL */}
+        <Route
+          path="/historial"
+          element={<Historial />}
+        />
+
         {/* ADMINISTRADOR */}
         <Route
           path="/admin"
@@ -81,4 +88,3 @@ function App() {
 }
 
 export default App
-
