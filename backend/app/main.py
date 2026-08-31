@@ -947,8 +947,8 @@ def eliminar_usuario_admin(
         return {
             "mensaje": "Usuario eliminado correctamente"
         }
-        
-        
+
+
 # =========================================================
 # REGISTRAR PUNTO ECOLÓGICO
 # =========================================================
@@ -1115,10 +1115,6 @@ def aprobar_punto(
 
         return punto
 
-        return punto
-    
-    
-    
 # =========================================================
 # ADMIN - RECHAZAR PUNTO
 # =========================================================
