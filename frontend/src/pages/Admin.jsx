@@ -887,13 +887,8 @@ function Admin() {
 
             <div className="flex items-center gap-2">
 
-              <span className="text-2xl">
-                🌱
-              </span>
 
-              <h1 className="text-2xl font-black tracking-tight bg-gradient-to-r from-[#218739] to-[#4caf68] bg-clip-text text-transparent">
-                eco-TRACE
-              </h1>
+
 
             </div>
 
