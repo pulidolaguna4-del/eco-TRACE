@@ -26,6 +26,9 @@ from app.models import (
     Punto,
     PuntoRegistro,
     PuntoRespuesta,
+    Entrega,
+    EntregaRegistro,
+    EntregaRespuesta,
     CodigoRecuperacion,
     SolicitarRecuperacion,
     VerificarCodigo,
@@ -193,6 +196,110 @@ Equipo Eco-TRACE
             detail="No se pudo enviar el correo de recuperación"
         )
 
+
+
+# =========================================================
+# FUNCIÓN PARA NOTIFICAR ESTADO DE UN PUNTO
+# =========================================================
+
+def enviar_notificacion_punto(
+    correo_destino: str,
+    nombre_usuario: str,
+    nombre_punto: str,
+    estado: str
+):
+
+    print("========================================")
+    print("📧 INTENTANDO ENVIAR NOTIFICACIÓN")
+    print("📧 DESTINATARIO:", correo_destino)
+    print("👤 USUARIO:", nombre_usuario)
+    print("📍 PUNTO:", nombre_punto)
+    print("📌 ESTADO:", estado)
+    print("========================================")
+
+    mensaje = EmailMessage()
+
+    if estado == "aprobado":
+
+        mensaje["Subject"] = "¡Tu punto fue aprobado! - Eco-TRACE"
+
+        contenido = f"""
+Hola {nombre_usuario},
+
+¡Tenemos buenas noticias!
+
+Tu punto ecológico:
+
+"{nombre_punto}"
+
+ha sido APROBADO por un administrador de Eco-TRACE.
+
+Ya puedes encontrarlo disponible en el mapa de Eco-TRACE.
+
+Gracias por contribuir al cuidado del medio ambiente.
+
+Saludos,
+
+Equipo Eco-TRACE
+"""
+
+    else:
+
+        mensaje["Subject"] = "Actualización sobre tu punto - Eco-TRACE"
+
+        contenido = f"""
+Hola {nombre_usuario},
+
+Te informamos que tu punto ecológico:
+
+"{nombre_punto}"
+
+ha sido RECHAZADO por un administrador de Eco-TRACE.
+
+Puedes revisar la información registrada y realizar una nueva propuesta si lo consideras necesario.
+
+Gracias por contribuir a Eco-TRACE.
+
+Saludos,
+
+Equipo Eco-TRACE
+"""
+
+    mensaje["From"] = EMAIL_USER
+    mensaje["To"] = correo_destino
+
+    mensaje.set_content(contenido)
+
+    try:
+
+        with smtplib.SMTP(
+            EMAIL_HOST,
+            EMAIL_PORT
+        ) as servidor:
+
+            servidor.starttls()
+
+            servidor.login(
+                EMAIL_USER,
+                EMAIL_PASSWORD
+            )
+
+            servidor.send_message(
+                mensaje
+            )
+
+        print(
+            f"Correo de notificación enviado a {correo_destino}"
+        )
+
+    except Exception as error:
+
+        # El punto ya fue aprobado/rechazado.
+        # Un error de correo no debe deshacer la operación.
+        print(
+            "ERROR AL ENVIAR NOTIFICACIÓN:",
+            error
+        )
 
 # =========================================================
 # OBTENER USUARIO ACTUAL
@@ -681,14 +788,40 @@ def actualizar_mi_perfil(
 
 
 # =========================================================
-# ELIMINAR USUARIO
+# ADMIN - LISTAR USUARIOS
 # =========================================================
 
-@app.delete("/usuarios/{usuario_id}")
-def eliminar_usuario(
+@app.get(
+    "/admin/usuarios",
+    response_model=list[UsuarioRespuesta]
+)
+def listar_usuarios_admin(
+    administrador: Usuario = Depends(
+        obtener_admin_actual
+    )
+):
+
+    with Session(engine) as session:
+
+        usuarios = session.exec(
+            select(Usuario)
+        ).all()
+
+        return usuarios
+
+
+# =========================================================
+# ADMIN - CONVERTIR / QUITAR ADMINISTRADOR
+# =========================================================
+
+@app.put(
+    "/admin/usuarios/{usuario_id}/admin",
+    response_model=UsuarioRespuesta
+)
+def cambiar_estado_admin(
     usuario_id: int,
-    usuario_actual: Usuario = Depends(
-        obtener_usuario_actual
+    administrador: Usuario = Depends(
+        obtener_admin_actual
     )
 ):
 
@@ -706,7 +839,109 @@ def eliminar_usuario(
                 detail="Usuario no encontrado"
             )
 
+        # No permitir que un administrador se quite
+        # sus propios permisos accidentalmente
+        if usuario.id == administrador.id:
+
+            raise HTTPException(
+                status_code=400,
+                detail="No puedes cambiar tus propios permisos de administrador"
+            )
+
+        # Cambiar estado
+        usuario.es_admin = not usuario.es_admin
+
+        session.add(usuario)
+        session.commit()
+        session.refresh(usuario)
+
+        return usuario
+
+
+# =========================================================
+# ADMIN - ELIMINAR USUARIO
+# =========================================================
+
+@app.delete(
+    "/admin/usuarios/{usuario_id}"
+)
+def eliminar_usuario_admin(
+    usuario_id: int,
+    administrador: Usuario = Depends(
+        obtener_admin_actual
+    )
+):
+
+    with Session(engine) as session:
+
+        usuario = session.get(
+            Usuario,
+            usuario_id
+        )
+
+        if not usuario:
+
+            raise HTTPException(
+                status_code=404,
+                detail="Usuario no encontrado"
+            )
+
+        # No permitir eliminarse a sí mismo
+        if usuario.id == administrador.id:
+
+            raise HTTPException(
+                status_code=400,
+                detail="No puedes eliminar tu propia cuenta desde el panel de administración"
+            )
+
+        # -------------------------------------------------
+        # Eliminar entregas relacionadas con los puntos
+        # del usuario
+        # -------------------------------------------------
+
+        puntos_usuario = session.exec(
+            select(Punto).where(
+                Punto.usuario_id == usuario.id
+            )
+        ).all()
+
+        for punto in puntos_usuario:
+
+            entregas_punto = session.exec(
+                select(Entrega).where(
+                    Entrega.punto_id == punto.id
+                )
+            ).all()
+
+            for entrega in entregas_punto:
+                session.delete(entrega)
+
+        # -------------------------------------------------
+        # Eliminar entregas realizadas por el usuario
+        # -------------------------------------------------
+
+        entregas_usuario = session.exec(
+            select(Entrega).where(
+                Entrega.usuario_id == usuario.id
+            )
+        ).all()
+
+        for entrega in entregas_usuario:
+            session.delete(entrega)
+
+        # -------------------------------------------------
+        # Eliminar puntos creados por el usuario
+        # -------------------------------------------------
+
+        for punto in puntos_usuario:
+            session.delete(punto)
+
+        # -------------------------------------------------
+        # Eliminar usuario
+        # -------------------------------------------------
+
         session.delete(usuario)
+
         session.commit()
 
         return {
@@ -850,13 +1085,36 @@ def aprobar_punto(
                 detail="Punto no encontrado"
             )
 
+        # Buscar al usuario que creó el punto
+        usuario = session.get(
+            Usuario,
+            punto.usuario_id
+        )
+
+        if not usuario:
+
+            raise HTTPException(
+                status_code=404,
+                detail="Usuario propietario del punto no encontrado"
+            )
+
+        # Cambiar estado
         punto.estado = "aprobado"
 
         session.add(punto)
         session.commit()
         session.refresh(punto)
 
+        # Enviar notificación después de guardar el cambio
+        enviar_notificacion_punto(
+            correo_destino=usuario.correo,
+            nombre_usuario=usuario.nombre,
+            nombre_punto=punto.nombre,
+            estado="aprobado"
+        )
+
         return punto
+
 
 
 # =========================================================
@@ -888,10 +1146,120 @@ def rechazar_punto(
                 detail="Punto no encontrado"
             )
 
+        # Buscar al usuario que creó el punto
+        usuario = session.get(
+            Usuario,
+            punto.usuario_id
+        )
+
+        if not usuario:
+
+            raise HTTPException(
+                status_code=404,
+                detail="Usuario propietario del punto no encontrado"
+            )
+
+        # Cambiar estado
         punto.estado = "rechazado"
 
         session.add(punto)
         session.commit()
         session.refresh(punto)
 
+        # Enviar notificación después de guardar el cambio
+        enviar_notificacion_punto(
+            correo_destino=usuario.correo,
+            nombre_usuario=usuario.nombre,
+            nombre_punto=punto.nombre,
+            estado="rechazado"
+        )
+
         return punto
+
+
+    # =========================================================
+# REGISTRAR ENTREGA / DONACIÓN / RECICLAJE
+# =========================================================
+
+@app.post(
+    "/entregas",
+    response_model=EntregaRespuesta
+)
+def registrar_entrega(
+    datos: EntregaRegistro,
+    usuario_actual: Usuario = Depends(
+        obtener_usuario_actual
+    )
+):
+
+    with Session(engine) as session:
+
+        # Verificar que el punto exista
+        punto = session.get(
+            Punto,
+            datos.punto_id
+        )
+
+        if not punto:
+            raise HTTPException(
+                status_code=404,
+                detail="Punto no encontrado"
+            )
+
+        # Verificar que el punto esté aprobado
+        if punto.estado != "aprobado":
+            raise HTTPException(
+                status_code=400,
+                detail="No puedes registrar una entrega en un punto que no está aprobado"
+            )
+
+        # Validar cantidad
+        if datos.cantidad <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail="La cantidad debe ser mayor que 0"
+            )
+
+        nueva_entrega = Entrega(
+            usuario_id=usuario_actual.id,
+            punto_id=datos.punto_id,
+            tipo=datos.tipo,
+            cantidad=datos.cantidad,
+            unidad=datos.unidad,
+            estado="registrada"
+        )
+
+        session.add(nueva_entrega)
+        session.commit()
+        session.refresh(nueva_entrega)
+
+        return nueva_entrega
+
+
+# =========================================================
+# OBTENER MI HISTORIAL DE ENTREGAS
+# =========================================================
+
+@app.get(
+    "/entregas/mis-entregas",
+    response_model=list[EntregaRespuesta]
+)
+def listar_mis_entregas(
+    usuario_actual: Usuario = Depends(
+        obtener_usuario_actual
+    )
+):
+
+    with Session(engine) as session:
+
+        entregas = session.exec(
+            select(Entrega)
+            .where(
+                Entrega.usuario_id == usuario_actual.id
+            )
+            .order_by(
+                Entrega.fecha.desc()
+            )
+        ).all()
+
+        return entregas
