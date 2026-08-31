@@ -9,6 +9,7 @@ import Home from './pages/Home'
 import Mapa from './pages/Mapa'
 import Perfil from './pages/Perfil'
 import Admin from './pages/Admin'
+import MisPuntos from './pages/MisPuntos'
 import Historial from './pages/Historial'
 
 function AppContent() {
@@ -60,10 +61,15 @@ function AppContent() {
           element={<Mapa />}
         />
 
-        {/* PERFIL */}
+        {/* PERFIL Y MIS PUNTOS */}
         <Route
           path="/perfil"
           element={<Perfil />}
+        />
+
+        <Route
+          path="/mis-puntos"
+          element={<MisPuntos />}
         />
 
         {/* HISTORIAL */}
