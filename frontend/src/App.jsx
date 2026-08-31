@@ -10,6 +10,7 @@ import Mapa from './pages/Mapa'
 import Perfil from './pages/Perfil'
 import Admin from './pages/Admin'
 import MisPuntos from './pages/MisPuntos'
+import Historial from './pages/Historial'
 
 function AppContent() {
   const location = useLocation()
@@ -69,6 +70,12 @@ function AppContent() {
         <Route
           path="/mis-puntos"
           element={<MisPuntos />}
+        />
+
+        {/* HISTORIAL */}
+        <Route
+          path="/historial"
+          element={<Historial />}
         />
 
         {/* ADMINISTRADOR */}
