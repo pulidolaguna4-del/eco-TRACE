@@ -627,8 +627,6 @@ function Mapa() {
       descripcion: formulario.descripcion,
       direccion: formulario.direccion,
       localidad: 'Ciudad Bolívar',
-      // Compatibilidad temporal con backend actual (enviar primer elemento en `tipo` y `categorias`)
-      tipo: formulario.categorias[0],
       categorias: formulario.categorias,
       latitud: ubicacionSeleccionada[0],
       longitud: ubicacionSeleccionada[1]

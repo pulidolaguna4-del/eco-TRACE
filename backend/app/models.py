@@ -99,6 +99,44 @@ class TokenRespuesta(SQLModel):
 
 
 # =========================================================
+# CATEGORÍA Y TABLA INTERMEDIA PUNTO-CATEGORÍA
+# =========================================================
+
+class PuntoCategoria(SQLModel, table=True):
+
+    __tablename__ = "punto_categoria"
+
+    punto_id: int = Field(
+        foreign_key="puntos.id",
+        primary_key=True
+    )
+
+    categoria_id: int = Field(
+        foreign_key="categorias.id",
+        primary_key=True
+    )
+
+
+class Categoria(SQLModel, table=True):
+
+    __tablename__ = "categorias"
+
+    id: Optional[int] = Field(
+        default=None,
+        primary_key=True
+    )
+
+    nombre: str = Field(
+        unique=True
+    )
+
+    puntos: List["Punto"] = Relationship(
+        back_populates="categorias",
+        link_model=PuntoCategoria
+    )
+
+
+# =========================================================
 # PUNTO ECOLÓGICO
 # =========================================================
 
@@ -118,8 +156,6 @@ class Punto(SQLModel, table=True):
     direccion: str
 
     localidad: str
-
-    tipo: str
 
     latitud: float
 
@@ -153,6 +189,11 @@ class Punto(SQLModel, table=True):
         back_populates="punto"
     )
 
+    categorias: List[Categoria] = Relationship(
+        back_populates="puntos",
+        link_model=PuntoCategoria
+    )
+
 
 # =========================================================
 # REGISTRO DE PUNTO
@@ -168,7 +209,7 @@ class PuntoRegistro(SQLModel):
 
     localidad: str
 
-    tipo: str
+    categorias: List[str]
 
     latitud: float
 
@@ -193,7 +234,7 @@ class PuntoRespuesta(SQLModel):
 
     localidad: str
 
-    tipo: str
+    categorias: List[str]
 
     latitud: float
 
