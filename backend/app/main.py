@@ -23,6 +23,8 @@ from app.models import (
     UsuarioActualizar,
     UsuarioLogin,
     TokenRespuesta,
+    Categoria,
+    PuntoCategoria,
     Punto,
     PuntoRegistro,
     PuntoRespuesta,
@@ -107,10 +109,43 @@ security = HTTPBearer()
 # CREAR TABLAS Y ACTUALIZAR BASE DE DATOS
 # =========================================================
 
+CATEGORIAS_INICIALES = [
+    "Reciclaje Tradicional",
+    "Donación de Ropa",
+    "Residuos Electrónicos"
+]
+
+
+def construir_punto_respuesta(punto: Punto) -> PuntoRespuesta:
+    nombres_categorias = [c.nombre for c in punto.categorias]
+    return PuntoRespuesta(
+        id=punto.id,
+        nombre=punto.nombre,
+        descripcion=punto.descripcion,
+        direccion=punto.direccion,
+        localidad=punto.localidad,
+        categorias=nombres_categorias,
+        latitud=punto.latitud,
+        longitud=punto.longitud,
+        estado=punto.estado,
+        fecha_creacion=punto.fecha_creacion,
+        foto_url=punto.foto_url,
+        motivo_rechazo=punto.motivo_rechazo,
+        usuario_id=punto.usuario_id
+    )
+
+
 @app.on_event("startup")
 def crear_tablas():
 
     SQLModel.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        categorias_existentes = session.exec(select(Categoria)).all()
+        if not categorias_existentes:
+            for cat_nombre in CATEGORIAS_INICIALES:
+                session.add(Categoria(nombre=cat_nombre))
+            session.commit()
 
     with engine.begin() as conexion:
 
@@ -999,14 +1034,34 @@ def registrar_punto(
     )
 ):
 
+    if not datos.categorias:
+        raise HTTPException(
+            status_code=400,
+            detail="Debe seleccionar al menos una categoría"
+        )
+
     with Session(engine) as session:
+
+        categorias_db = session.exec(
+            select(Categoria).where(
+                Categoria.nombre.in_(datos.categorias)
+            )
+        ).all()
+
+        cat_map = {c.nombre: c for c in categorias_db}
+
+        for cat_nombre in datos.categorias:
+            if cat_nombre not in cat_map:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"La categoría '{cat_nombre}' no existe"
+                )
 
         nuevo_punto = Punto(
             nombre=datos.nombre,
             descripcion=datos.descripcion,
             direccion=datos.direccion,
             localidad=datos.localidad,
-            tipo=datos.tipo,
             latitud=datos.latitud,
             longitud=datos.longitud,
             foto_url=datos.foto_url,
@@ -1014,11 +1069,13 @@ def registrar_punto(
             usuario_id=usuario_actual.id
         )
 
+        nuevo_punto.categorias = [cat_map[c] for c in datos.categorias]
+
         session.add(nuevo_punto)
         session.commit()
         session.refresh(nuevo_punto)
 
-        return nuevo_punto
+        return construir_punto_respuesta(nuevo_punto)
 
 
 # =========================================================
@@ -1039,7 +1096,7 @@ def listar_puntos():
             )
         ).all()
 
-        return puntos
+        return [construir_punto_respuesta(p) for p in puntos]
 
 
 # =========================================================
@@ -1064,7 +1121,7 @@ def listar_mis_puntos(
             )
         ).all()
 
-        return puntos
+        return [construir_punto_respuesta(p) for p in puntos]
 
 
 # =========================================================
@@ -1089,7 +1146,7 @@ def listar_puntos_pendientes(
             )
         ).all()
 
-        return puntos
+        return [construir_punto_respuesta(p) for p in puntos]
 
 
 # =========================================================
@@ -1149,7 +1206,7 @@ def aprobar_punto(
             estado="aprobado"
         )
 
-        return punto
+        return construir_punto_respuesta(punto)
 
 # =========================================================
 # ADMIN - RECHAZAR PUNTO
@@ -1212,7 +1269,7 @@ def rechazar_punto(
             motivo_rechazo=punto.motivo_rechazo
         )
 
-        return punto
+        return construir_punto_respuesta(punto)
 
 # =========================================================
 # REGISTRAR ENTREGA / DONACIÓN / RECICLAJE

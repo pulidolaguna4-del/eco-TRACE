@@ -12,19 +12,19 @@
 
 export const CATEGORIAS_DISPONIBLES = [
   {
-    id: 'Reciclaje',
+    id: 'Reciclaje Tradicional',
     nombre: 'Reciclaje Tradicional',
     icono: '♻️',
     color: '#218739'
   },
   {
-    id: 'Ropa',
+    id: 'Donación de Ropa',
     nombre: 'Donación de Ropa',
     icono: '👕',
     color: '#1976d2'
   },
   {
-    id: 'Electrónicos',
+    id: 'Residuos Electrónicos',
     nombre: 'Residuos Electrónicos',
     icono: '💻',
     color: '#7b1fa2'
