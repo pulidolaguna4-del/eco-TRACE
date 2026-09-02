@@ -1,7 +1,7 @@
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, SQLModel, Relationship
 
 
 # =========================================================
@@ -29,6 +29,18 @@ class Usuario(SQLModel, table=True):
     # Indica si el usuario es administrador
     es_admin: bool = Field(
         default=False
+    )
+
+    puntos: List["Punto"] = Relationship(
+        back_populates="usuario"
+    )
+
+    entregas: List["Entrega"] = Relationship(
+        back_populates="usuario"
+    )
+
+    codigos_recuperacion: List["CodigoRecuperacion"] = Relationship(
+        back_populates="usuario"
     )
 
 
@@ -117,8 +129,28 @@ class Punto(SQLModel, table=True):
         default="pendiente"
     )
 
+    fecha_creacion: datetime = Field(
+        default_factory=datetime.now
+    )
+
+    foto_url: Optional[str] = Field(
+        default=None
+    )
+
+    motivo_rechazo: Optional[str] = Field(
+        default=None
+    )
+
     usuario_id: int = Field(
         foreign_key="usuarios.id"
+    )
+
+    usuario: Optional[Usuario] = Relationship(
+        back_populates="puntos"
+    )
+
+    entregas: List["Entrega"] = Relationship(
+        back_populates="punto"
     )
 
 
@@ -141,6 +173,8 @@ class PuntoRegistro(SQLModel):
     latitud: float
 
     longitud: float
+
+    foto_url: Optional[str] = None
 
 
 # =========================================================
@@ -167,7 +201,22 @@ class PuntoRespuesta(SQLModel):
 
     estado: str
 
+    fecha_creacion: datetime
+
+    foto_url: Optional[str] = None
+
+    motivo_rechazo: Optional[str] = None
+
     usuario_id: int
+
+
+# =========================================================
+# RECHAZO DE PUNTO
+# =========================================================
+
+class PuntoRechazo(SQLModel):
+
+    motivo_rechazo: Optional[str] = None
 
 
 # =========================================================
@@ -213,6 +262,14 @@ class Entrega(SQLModel, table=True):
     # registrada, confirmada, cancelada
     estado: str = Field(
         default="registrada"
+    )
+
+    usuario: Optional[Usuario] = Relationship(
+        back_populates="entregas"
+    )
+
+    punto: Optional[Punto] = Relationship(
+        back_populates="entregas"
     )
 
 
@@ -267,7 +324,8 @@ class CodigoRecuperacion(SQLModel, table=True):
         primary_key=True
     )
 
-    correo: str = Field(
+    usuario_id: int = Field(
+        foreign_key="usuarios.id",
         index=True
     )
 
@@ -277,6 +335,10 @@ class CodigoRecuperacion(SQLModel, table=True):
 
     utilizado: bool = Field(
         default=False
+    )
+
+    usuario: Optional[Usuario] = Relationship(
+        back_populates="codigos_recuperacion"
     )
 
 

@@ -26,6 +26,7 @@ from app.models import (
     Punto,
     PuntoRegistro,
     PuntoRespuesta,
+    PuntoRechazo,
     Entrega,
     EntregaRegistro,
     EntregaRespuesta,
@@ -86,8 +87,11 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
-        "http://127.0.0.1:5173"
+        "http://127.0.0.1:5173",
+        "http://localhost",
+        "http://127.0.0.1"
     ],
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:[0-9]+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -206,7 +210,8 @@ def enviar_notificacion_punto(
     correo_destino: str,
     nombre_usuario: str,
     nombre_punto: str,
-    estado: str
+    estado: str,
+    motivo_rechazo: str = None
 ):
 
     print("========================================")
@@ -215,6 +220,8 @@ def enviar_notificacion_punto(
     print("👤 USUARIO:", nombre_usuario)
     print("📍 PUNTO:", nombre_punto)
     print("📌 ESTADO:", estado)
+    if motivo_rechazo:
+        print("📝 MOTIVO RECHAZO:", motivo_rechazo)
     print("========================================")
 
     mensaje = EmailMessage()
@@ -247,6 +254,8 @@ Equipo Eco-TRACE
 
         mensaje["Subject"] = "Actualización sobre tu punto - Eco-TRACE"
 
+        motivo_texto = f"\nMotivo de rechazo: {motivo_rechazo}\n" if motivo_rechazo else ""
+
         contenido = f"""
 Hola {nombre_usuario},
 
@@ -254,7 +263,7 @@ Te informamos que tu punto ecológico:
 
 "{nombre_punto}"
 
-ha sido RECHAZADO por un administrador de Eco-TRACE.
+ha sido RECHAZADO por un administrador de Eco-TRACE.{motivo_texto}
 
 Puedes revisar la información registrada y realizar una nueva propuesta si lo consideras necesario.
 
@@ -551,7 +560,7 @@ def solicitar_recuperacion(
         # Invalidar códigos anteriores
         codigos_anteriores = session.exec(
             select(CodigoRecuperacion).where(
-                CodigoRecuperacion.correo == datos.correo,
+                CodigoRecuperacion.usuario_id == usuario.id,
                 CodigoRecuperacion.utilizado == False
             )
         ).all()
@@ -564,7 +573,7 @@ def solicitar_recuperacion(
 
         # Crear nuevo código
         nuevo_codigo = CodigoRecuperacion(
-            correo=datos.correo,
+            usuario_id=usuario.id,
             codigo=codigo,
             fecha_expiracion=fecha_expiracion,
             utilizado=False
@@ -595,9 +604,22 @@ def verificar_codigo(
 
     with Session(engine) as session:
 
+        usuario = session.exec(
+            select(Usuario).where(
+                Usuario.correo == datos.correo
+            )
+        ).first()
+
+        if not usuario:
+
+            raise HTTPException(
+                status_code=404,
+                detail="No existe una cuenta con ese correo"
+            )
+
         codigo_recuperacion = session.exec(
             select(CodigoRecuperacion).where(
-                CodigoRecuperacion.correo == datos.correo,
+                CodigoRecuperacion.usuario_id == usuario.id,
                 CodigoRecuperacion.codigo == datos.codigo,
                 CodigoRecuperacion.utilizado == False
             )
@@ -637,9 +659,22 @@ def cambiar_contrasena(
 
     with Session(engine) as session:
 
+        usuario = session.exec(
+            select(Usuario).where(
+                Usuario.correo == datos.correo
+            )
+        ).first()
+
+        if not usuario:
+
+            raise HTTPException(
+                status_code=404,
+                detail="Usuario no encontrado"
+            )
+
         codigo_recuperacion = session.exec(
             select(CodigoRecuperacion).where(
-                CodigoRecuperacion.correo == datos.correo,
+                CodigoRecuperacion.usuario_id == usuario.id,
                 CodigoRecuperacion.codigo == datos.codigo,
                 CodigoRecuperacion.utilizado == False
             )
@@ -661,19 +696,6 @@ def cambiar_contrasena(
             raise HTTPException(
                 status_code=400,
                 detail="El código ha expirado"
-            )
-
-        usuario = session.exec(
-            select(Usuario).where(
-                Usuario.correo == datos.correo
-            )
-        ).first()
-
-        if not usuario:
-
-            raise HTTPException(
-                status_code=404,
-                detail="Usuario no encontrado"
             )
 
         # Guardar nueva contraseña hasheada
@@ -937,6 +959,19 @@ def eliminar_usuario_admin(
             session.delete(punto)
 
         # -------------------------------------------------
+        # Eliminar codigos de recuperacion del usuario
+        # -------------------------------------------------
+
+        codigos_usuario = session.exec(
+            select(CodigoRecuperacion).where(
+                CodigoRecuperacion.usuario_id == usuario.id
+            )
+        ).all()
+
+        for codigo in codigos_usuario:
+            session.delete(codigo)
+
+        # -------------------------------------------------
         # Eliminar usuario
         # -------------------------------------------------
 
@@ -974,6 +1009,7 @@ def registrar_punto(
             tipo=datos.tipo,
             latitud=datos.latitud,
             longitud=datos.longitud,
+            foto_url=datos.foto_url,
             estado="pendiente",
             usuario_id=usuario_actual.id
         )
@@ -1125,6 +1161,7 @@ def aprobar_punto(
 )
 def rechazar_punto(
     punto_id: int,
+    datos: PuntoRechazo = None,
     administrador: Usuario = Depends(
         obtener_admin_actual
     )
@@ -1157,8 +1194,10 @@ def rechazar_punto(
                 detail="Usuario propietario del punto no encontrado"
             )
 
-        # Cambiar estado
+        # Cambiar estado y guardar motivo_rechazo si se proporciona
         punto.estado = "rechazado"
+        if datos and datos.motivo_rechazo:
+            punto.motivo_rechazo = datos.motivo_rechazo
 
         session.add(punto)
         session.commit()
@@ -1169,10 +1208,12 @@ def rechazar_punto(
             correo_destino=usuario.correo,
             nombre_usuario=usuario.nombre,
             nombre_punto=punto.nombre,
-            estado="rechazado"
+            estado="rechazado",
+            motivo_rechazo=punto.motivo_rechazo
         )
 
         return punto
+
 # =========================================================
 # REGISTRAR ENTREGA / DONACIÓN / RECICLAJE
 # =========================================================

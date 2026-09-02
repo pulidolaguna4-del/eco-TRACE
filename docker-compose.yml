@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: eco_trace_db
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: eco_trace
+      POSTGRES_PASSWORD: eco_trace_password
+      POSTGRES_DB: eco_trace
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: eco_trace_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://eco_trace:eco_trace_password@postgres:5432/eco_trace
+      SECRET_KEY: ${SECRET_KEY:-eco_trace_super_secret_key_change_in_production_12345}
+      EMAIL_HOST: ${EMAIL_HOST:-smtp.gmail.com}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_USER: ${EMAIL_USER:-noreply@ecotrace.com}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD:-dummy_password}
+    depends_on:
+      - postgres
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: eco_trace_frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
