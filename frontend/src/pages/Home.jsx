@@ -130,6 +130,16 @@ function Home() {
 
         <div className="max-w-6xl mx-auto relative z-10 text-center">
 
+          {/* MARCA DE COORDENADAS: refuerza la idea de "trazar" un punto real en la ciudad */}
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4 }}
+            className="font-mono text-[11px] tracking-[0.2em] text-gray-400 dark:text-gray-600 mb-4 uppercase"
+          >
+            Bogotá · Ciudad Bolívar · Red comunitaria activa
+          </motion.p>
+
           {/* BADGE ELEMENTO DISTINTIVO: SELLO DE VERIFICACIÓN */}
           <motion.div
             initial={{ opacity: 0, scale: prefiereReducido ? 1 : 0.9 }}
@@ -138,14 +148,14 @@ function Home() {
             className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white dark:bg-[#121816] text-[#218739] dark:text-[#2fa350] border border-[#218739]/20 dark:border-gray-800 text-xs font-extrabold mb-6 shadow-2xs"
           >
             <span className="w-2 h-2 rounded-full bg-[#218739] dark:bg-[#2fa350] animate-ping"></span>
-            <span>Auditoría & Moderación Humana Activa</span>
+            <span>Verificación comunitaria activa</span>
           </motion.div>
 
           {/* TÍTULO PRINCIPAL CON TEXTO ANIMADO */}
           <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight mb-6 leading-tight">
-            <TextoAnimado texto="Traza el mapa ecológico de tu " />
+            <TextoAnimado texto="Cada punto ecológico, " />
             <span className="bg-gradient-to-r from-[#218739] to-[#4caf68] dark:from-[#2fa350] dark:to-[#4caf68] bg-clip-text text-transparent">
-              ciudad real
+              trazado y verificado
             </span>
           </h1>
 
@@ -155,7 +165,7 @@ function Home() {
             transition={{ delay: 0.4, duration: 0.5 }}
             className="text-base sm:text-xl text-gray-600 dark:text-[#a8b3ae] max-w-3xl mx-auto mb-10 leading-relaxed font-medium"
           >
-            Reemplazamos los datos dispersos por una red verificada de reciclaje, ropa y residuos electrónicos. Cada punto es moderado antes de publicarse para garantizar su vigencia.
+            eco-TRACE es el registro comunitario de lugares de reciclaje, donación de ropa y residuos electrónicos en tu ciudad. Nadie publica un punto sin que alguien más lo confirme primero.
           </motion.p>
 
           {/* ACCIONES DINÁMICAS (CONDICIONADAS A AUTENTICACIÓN - FASE 5/6) */}
@@ -183,7 +193,7 @@ function Home() {
                 className="px-8 py-3.5 bg-white dark:bg-[#1a2320] text-gray-800 dark:text-[#f2f5f3] border border-gray-200 dark:border-gray-800 text-sm font-bold rounded-2xl shadow-2xs hover:shadow-md transition-all cursor-pointer flex items-center gap-2"
               >
                 <span>🌱</span>
-                <span>Ir a Mi Panel de Aportes</span>
+                <span>Ir a Mi Panel</span>
               </motion.button>
             ) : (
               <motion.button
@@ -206,21 +216,21 @@ function Home() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center relative z-10">
             <div className="md:col-span-2 space-y-3">
               <span className="text-xs font-extrabold uppercase tracking-wider text-[#218739] dark:text-[#2fa350]">
-                El Pilar de Confianza
+                Por qué confiar
               </span>
               <h2 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white">
-                Cero rumores, cero datos obsoletos.
+                La verificación no es un detalle, es el producto.
               </h2>
               <p className="text-xs sm:text-sm text-gray-500 dark:text-[#a8b3ae] leading-relaxed">
-                A diferencia de publicaciones sueltas en redes o grupos informales, en eco-TRACE cada coordenada enviada por la comunidad es revisada en nuestro Panel Administrativo antes de hacerse pública. Si está en el mapa, está verificado.
+                En eco-TRACE ningún punto llega solo al mapa: cada coordenada enviada por la comunidad pasa primero por nuestro Panel de Moderación. Si aparece ahí, es porque alguien más ya lo confirmó.
               </p>
             </div>
 
             <div className="bg-[#f1f8f4] dark:bg-[#121816] p-6 rounded-2xl border border-[#218739]/20 text-center space-y-2">
               <span className="text-4xl block">🛡️</span>
-              <div className="text-2xl font-black text-[#218739] dark:text-[#2fa350]">100% Validado</div>
+              <div className="text-2xl font-black text-[#218739] dark:text-[#2fa350]">100% Verificado</div>
               <p className="text-[11px] text-gray-500 dark:text-[#a8b3ae] font-semibold">
-                Control de calidad comunitario permanente
+                Revisado por moderadores antes de publicarse
               </p>
             </div>
           </div>
@@ -231,10 +241,10 @@ function Home() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-16">
         <div className="text-center mb-10">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white">
-            Impacto en Cifras
+            El mapa, en cifras
           </h2>
           <p className="text-xs sm:text-sm text-gray-500 dark:text-[#a8b3ae] mt-1">
-            Transparencia y estadísticas en tiempo real de nuestra red.
+            Datos reales de la red, actualizados con cada verificación.
           </p>
         </div>
 
@@ -244,14 +254,14 @@ function Home() {
             <div className="text-3xl font-black text-[#218739] dark:text-[#2fa350]">
               {cargando ? '...' : puntos.length}
             </div>
-            <div className="text-xs font-bold text-gray-800 dark:text-[#f2f5f3] mt-1">Puntos Aprobados</div>
+            <div className="text-xs font-bold text-gray-800 dark:text-[#f2f5f3] mt-1">Puntos Verificados</div>
             <p className="text-[11px] text-gray-400 mt-1">Visibles y disponibles en el mapa interactivo</p>
           </div>
 
           <div className="bg-white dark:bg-[#1a2320] p-6 rounded-2xl border border-gray-100 dark:border-gray-800/40 text-center shadow-2xs">
             <span className="text-3xl block mb-2">👕</span>
             <div className="text-3xl font-black text-blue-600 dark:text-blue-400">3+</div>
-            <div className="text-xs font-bold text-gray-800 dark:text-[#f2f5f3] mt-1">Tipos de Residuos</div>
+            <div className="text-xs font-bold text-gray-800 dark:text-[#f2f5f3] mt-1">Categorías Verificadas</div>
             <p className="text-[11px] text-gray-400 mt-1">Reciclaje tradicional, ropa y electrónicos</p>
           </div>
 
@@ -271,9 +281,9 @@ function Home() {
             <div className="flex gap-4 items-start">
               <span className="text-3xl p-3 bg-amber-100 dark:bg-amber-900/30 rounded-2xl shrink-0">🛡️</span>
               <div>
-                <h3 className="text-lg font-bold text-amber-900 dark:text-amber-400">Panel de Control Administrador</h3>
+                <h3 className="text-lg font-bold text-amber-900 dark:text-amber-400">Panel de Moderación</h3>
                 <p className="text-xs text-amber-800 dark:text-amber-300 mt-1 max-w-xl">
-                  Tienes permisos de moderación habilitados. Revisa las solicitudes de la comunidad y mantén la información al día.
+                  Tienes permisos de administrador. Revisa las solicitudes de la comunidad y mantén el mapa al día.
                 </p>
               </div>
             </div>
@@ -281,7 +291,7 @@ function Home() {
               onClick={() => navigate('/admin')}
               className="shrink-0 px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
             >
-              Ir a Moderación Admin
+              Ir a Moderación
             </button>
           </div>
         </section>
@@ -292,10 +302,10 @@ function Home() {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white">
-              Puntos Ecológicos Destacados
+              Puntos verificados en tu ciudad
             </h2>
             <p className="text-xs sm:text-sm text-gray-500 dark:text-[#a8b3ae] mt-1">
-              Lugares reales donde puedes llevar tus residuos hoy mismo.
+              Lugares reales, confirmados por la comunidad, listos para recibir tus residuos hoy.
             </p>
           </div>
 
@@ -315,7 +325,7 @@ function Home() {
             </div>
           ) : puntos.length === 0 ? (
             <div className="text-center py-12 text-xs text-gray-400 font-semibold">
-              🍃 No hay puntos disponibles todavía.
+              🍃 Aún no hay puntos verificados por aquí. Sé el primero en trazar uno.
             </div>
           ) : (
             <motion.div
