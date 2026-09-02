@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
+import { normalizarPunto } from '../utils/puntoUtils'
+import { CategoriasBadges } from '../components/CategoriasBadges'
 
 // =========================================================
 // HOOK PERSONALIZADO: useCountUp
@@ -134,7 +136,8 @@ function MisPuntos() {
         }
 
         const datos = await respuesta.json()
-        setMisPuntos(datos)
+        const puntosNormalizados = datos.map(normalizarPunto)
+        setMisPuntos(puntosNormalizados)
       } catch (err) {
         console.error(err)
         setError(err.message)
@@ -320,7 +323,10 @@ function MisPuntos() {
                     <div className="text-[11px] text-gray-400 font-medium flex items-center gap-4 flex-wrap pt-1">
                       <span>📍 <strong>Dirección:</strong> {punto.direccion}</span>
                       <span>🏙️ <strong>Localidad:</strong> {punto.localidad}</span>
-                      <span>🏷️ <strong>Tipo:</strong> {punto.tipo}</span>
+                      <div className="flex items-center gap-1">
+                        <span>🏷️ <strong>Categorías:</strong></span>
+                        <CategoriasBadges categorias={punto.categorias} />
+                      </div>
                     </div>
                   </div>
 

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
+import { normalizarPunto } from '../utils/puntoUtils'
+import { CategoriasBadges } from '../components/CategoriasBadges'
 
 // =========================================================
 // COMPONENTE: TextoAnimado
@@ -83,7 +85,8 @@ function Home() {
           throw new Error('No se pudieron obtener los puntos ecológicos')
         }
         const datos = await respuesta.json()
-        setPuntos(datos)
+        const puntosNormalizados = datos.map(normalizarPunto)
+        setPuntos(puntosNormalizados)
       } catch (err) {
         console.error(err)
         setError('No se pudieron cargar los datos actualizados')
@@ -158,7 +161,7 @@ function Home() {
             Reemplazamos los datos dispersos por una red verificada de reciclaje, ropa y residuos electrónicos. Cada punto es moderado antes de publicarse para garantizar su vigencia.
           </motion.p>
 
-          {/* ACCIONES DINÁMICAS (CONDICIONADAS A AUTENTICACIÓN - FASE 5/6) */}
+          {/* ACCIONES DINÁMICAS */}
           <motion.div
             initial={{ opacity: 0, y: prefiereReducido ? 0 : 15 }}
             animate={{ opacity: 1, y: 0 }}
@@ -200,7 +203,7 @@ function Home() {
         </div>
       </section>
 
-      {/* SECCIÓN MANIFIESTO: EL FACTOR DIFERENCIAL DE VERIFICACIÓN */}
+      {/* SECCIÓN MANIFIESTO */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 my-12">
         <div className="bg-white dark:bg-[#1a2320] rounded-3xl p-8 sm:p-12 border border-gray-100 dark:border-gray-800/40 shadow-xs relative overflow-hidden transition-colors">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center relative z-10">
@@ -264,7 +267,7 @@ function Home() {
         </div>
       </section>
 
-      {/* MÓDULO ADMINISTRADOR CONDICIONAL (SI ES ADMIN) */}
+      {/* MÓDULO ADMINISTRADOR CONDICIONAL */}
       {esAdmin && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-16">
           <div className="bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-3xl p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 shadow-2xs">
@@ -333,12 +336,7 @@ function Home() {
                 >
                   <div>
                     <div className="flex justify-between items-center mb-3">
-                      <span className="text-xl">
-                        {punto.tipo.toLowerCase().includes('electr') ? '🔌' : punto.tipo.toLowerCase().includes('ropa') ? '👕' : '♻️'}
-                      </span>
-                      <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase rounded-md bg-[#218739]/10 text-[#218739] dark:text-[#2fa350]">
-                        {punto.tipo}
-                      </span>
+                      <CategoriasBadges categorias={punto.categorias} />
                     </div>
                     <h3 className="font-extrabold text-sm text-gray-900 dark:text-[#f2f5f3] mb-1">
                       {punto.nombre}
