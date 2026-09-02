@@ -5,6 +5,8 @@ import {
   AnimatePresence,
   useReducedMotion
 } from 'framer-motion'
+import { normalizarPunto } from '../utils/puntoUtils'
+import { CategoriasBadges } from '../components/CategoriasBadges'
 
 const API_URL = 'http://127.0.0.1:8000'
 
@@ -376,8 +378,10 @@ function Admin() {
       const datosPendientes =
         await resPendientes.json()
 
+      const pendientesNormalizados = datosPendientes.map(normalizarPunto)
+
       setPuntosPendientes(
-        datosPendientes
+        pendientesNormalizados
       )
 
       // -----------------------------------------------------
@@ -427,8 +431,10 @@ function Admin() {
         const datosAprobados =
           await resAprobados.json()
 
+        const aprobadosNormalizados = datosAprobados.map(normalizarPunto)
+
         setPuntosAprobados(
-          datosAprobados
+          aprobadosNormalizados
         )
       }
 
@@ -503,12 +509,14 @@ function Admin() {
         )
 
         if (datos) {
+          const puntoNorm = normalizarPunto(datos)
+
           setPuntosAprobados(
             (prev) => {
               const yaExiste =
                 prev.some(
                   (punto) =>
-                    punto.id === datos.id
+                    punto.id === puntoNorm.id
                 )
 
               if (yaExiste) {
@@ -517,7 +525,7 @@ function Admin() {
 
               return [
                 ...prev,
-                datos
+                puntoNorm
               ]
             }
           )
@@ -1487,9 +1495,9 @@ function Admin() {
                                   {punto.nombre}
                                 </div>
 
-                                <span className="inline-block mt-1.5 px-2.5 py-0.5 text-[10px] font-extrabold tracking-wider rounded-lg bg-[#f1f8f4] dark:bg-[#0f1512] text-[#218739] uppercase">
-                                  {punto.tipo}
-                                </span>
+                                <div className="mt-1.5">
+                                  <CategoriasBadges categorias={punto.categorias} />
+                                </div>
 
                               </td>
 
