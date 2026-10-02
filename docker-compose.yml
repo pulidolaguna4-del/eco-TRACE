@@ -5,9 +5,9 @@ services:
     restart: unless-stopped
 
     environment:
-      POSTGRES_USER: eco_trace
-      POSTGRES_PASSWORD: eco_trace_password
-      POSTGRES_DB: eco_trace
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
 
     ports:
       - "5432:5432"
@@ -21,15 +21,18 @@ services:
       dockerfile: Dockerfile
     container_name: eco_trace_backend
     restart: unless-stopped
+
     ports:
       - "8000:8000"
+
     environment:
-      DATABASE_URL: postgresql://eco_trace:eco_trace_password@postgres:5432/eco_trace
-      SECRET_KEY: ${SECRET_KEY:-eco_trace_super_secret_key_change_in_production_12345}
-      EMAIL_HOST: ${EMAIL_HOST:-smtp.gmail.com}
-      EMAIL_PORT: ${EMAIL_PORT:-587}
-      EMAIL_USER: ${EMAIL_USER:-noreply@ecotrace.com}
-      EMAIL_PASSWORD: ${EMAIL_PASSWORD:-dummy_password}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      SECRET_KEY: ${SECRET_KEY:?Falta SECRET_KEY en .env}
+      EMAIL_HOST: ${EMAIL_HOST:?Falta EMAIL_HOST en .env}
+      EMAIL_PORT: ${EMAIL_PORT:?Falta EMAIL_PORT en .env}
+      EMAIL_USER: ${EMAIL_USER:?Falta EMAIL_USER en .env}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD:?Falta EMAIL_PASSWORD en .env}
+
     depends_on:
       - postgres
 
@@ -39,8 +42,10 @@ services:
       dockerfile: Dockerfile
     container_name: eco_trace_frontend
     restart: unless-stopped
+
     ports:
       - "5173:5173"
+
     depends_on:
       - backend
 
