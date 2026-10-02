@@ -414,3 +414,63 @@ class NuevaContrasena(SQLModel):
     codigo: str
 
     nueva_password: str
+
+
+# =========================================================
+# REPORTES DE PUNTOS ECOLÓGICOS
+# =========================================================
+
+from datetime import datetime
+from typing import Optional
+from sqlmodel import SQLModel, Field
+
+
+class Reporte(SQLModel, table=True):
+    __tablename__ = "reportes"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    punto_id: int = Field(
+        foreign_key="puntos.id",
+        index=True
+    )
+
+    usuario_id: int = Field(
+        foreign_key="usuarios.id",
+        index=True
+    )
+
+    motivo: str = Field(
+        min_length=5,
+        max_length=500
+    )
+
+    estado: str = Field(
+        default="pendiente",
+        index=True
+    )
+
+    fecha_creacion: datetime = Field(
+        default_factory=datetime.now
+    )
+
+    observacion_admin: Optional[str] = Field(
+        default=None,
+        max_length=500
+    )
+
+
+class ReporteRegistro(SQLModel):
+    punto_id: int
+    motivo: str = Field(
+        min_length=5,
+        max_length=500
+    )
+
+
+class ReporteRevision(SQLModel):
+    estado: str
+    observacion_admin: Optional[str] = Field(
+        default=None,
+        max_length=500
+    )

@@ -10,6 +10,10 @@ function Perfil() {
   const [nombre, setNombre] = useState('')
   const [correo, setCorreo] = useState('')
 
+  const [passwordActual, setPasswordActual] = useState('')
+  const [nuevaPassword, setNuevaPassword] = useState('')
+  const [confirmarPassword, setConfirmarPassword] = useState('')
+
   const [editando, setEditando] = useState(false)
   const [cargando, setCargando] = useState(true)
   const [guardando, setGuardando] = useState(false)
@@ -17,20 +21,20 @@ function Perfil() {
   const [mensaje, setMensaje] = useState('')
   const [error, setError] = useState('')
 
-  // =====================================================
+  // =========================================================
   // OBTENER USUARIO
-  // =====================================================
-
+  // =========================================================
   useEffect(() => {
-    const obtenerPerfil = async () => {
-      const token = localStorage.getItem('access_token')
-
-      if (!token) {
-        setCargando(false)
-        return
-      }
-
+    const cargarUsuario = async () => {
       try {
+        const token = localStorage.getItem('access_token')
+
+        if (!token) {
+          setError('No se encontró la sesión del usuario.')
+          setCargando(false)
+          return
+        }
+
         const respuesta = await fetch(
           'http://127.0.0.1:8000/usuarios/me',
           {
@@ -44,57 +48,100 @@ function Perfil() {
         const datos = await respuesta.json()
 
         if (!respuesta.ok) {
-          localStorage.removeItem('access_token')
-          localStorage.removeItem('usuario')
+          if (respuesta.status === 401) {
+            localStorage.removeItem('access_token')
+            localStorage.removeItem('usuario')
+          }
 
           setError(
-            datos.detail || 'Sesión inválida'
+            datos.detail ||
+              'No se pudo obtener la información del usuario.'
           )
 
+          setCargando(false)
           return
         }
 
         setUsuario(datos)
+        setNombre(datos.nombre || '')
+        setCorreo(datos.correo || '')
 
-        setNombre(datos.nombre)
-        setCorreo(datos.correo)
+        // Mantener actualizado el usuario guardado localmente
+        localStorage.setItem('usuario', JSON.stringify(datos))
 
-        // Actualizar información guardada
-        localStorage.setItem(
-          'usuario',
-          JSON.stringify(datos)
-        )
-
-      } catch (error) {
-        console.error(error)
-
-        setError(
-          'No se pudo conectar con el servidor'
-        )
-
-      } finally {
+        setCargando(false)
+      } catch (err) {
+        console.error(err)
+        setError('No se pudo conectar con el servidor.')
         setCargando(false)
       }
     }
 
-    obtenerPerfil()
+    cargarUsuario()
   }, [])
 
-  // =====================================================
-  // ACTUALIZAR PERFIL
-  // =====================================================
-
-  const actualizarPerfil = async (e) => {
+  // =========================================================
+  // GUARDAR CAMBIOS
+  // =========================================================
+  const guardarCambios = async (e) => {
     e.preventDefault()
 
-    setGuardando(true)
     setMensaje('')
     setError('')
 
     const token = localStorage.getItem('access_token')
 
+    if (!token) {
+      setError('No se encontró la sesión del usuario.')
+      return
+    }
+
+    // Validar nombre y correo
+    if (!nombre.trim() || !correo.trim()) {
+      setError('El nombre y el correo son obligatorios.')
+      return
+    }
+
+    // =======================================================
+    // VALIDAR CONTRASEÑA
+    // =======================================================
+    const quiereCambiarPassword =
+      passwordActual.trim() ||
+      nuevaPassword.trim() ||
+      confirmarPassword.trim()
+
+    if (quiereCambiarPassword) {
+      if (
+        !passwordActual.trim() ||
+        !nuevaPassword.trim() ||
+        !confirmarPassword.trim()
+      ) {
+        setError(
+          'Para cambiar la contraseña debes completar todos los campos.'
+        )
+        return
+      }
+
+      if (nuevaPassword.length < 8) {
+        setError(
+          'La nueva contraseña debe tener mínimo 8 caracteres.'
+        )
+        return
+      }
+
+      if (nuevaPassword !== confirmarPassword) {
+        setError('Las nuevas contraseñas no coinciden.')
+        return
+      }
+    }
+
+    setGuardando(true)
+
     try {
-      const respuesta = await fetch(
+      // =======================================================
+      // ACTUALIZAR PERFIL
+      // =======================================================
+      const respuestaPerfil = await fetch(
         'http://127.0.0.1:8000/usuarios/me',
         {
           method: 'PUT',
@@ -103,247 +150,375 @@ function Perfil() {
             Authorization: `Bearer ${token}`
           },
           body: JSON.stringify({
-            nombre: nombre,
-            correo: correo
+            nombre: nombre.trim(),
+            correo: correo.trim()
           })
         }
       )
 
-      const datos = await respuesta.json()
+      const datosPerfil = await respuestaPerfil.json()
 
-      if (!respuesta.ok) {
+      if (!respuestaPerfil.ok) {
         setError(
-          datos.detail || 'No se pudo actualizar el perfil'
+          datosPerfil.detail ||
+            'No se pudieron actualizar los datos del perfil.'
         )
-
+        setGuardando(false)
         return
       }
 
-      // Actualizar estado
-      setUsuario(datos)
+      // =======================================================
+      // CAMBIAR CONTRASEÑA SI EL USUARIO LO SOLICITÓ
+      // =======================================================
+      if (quiereCambiarPassword) {
+        const respuestaPassword = await fetch(
+          'http://127.0.0.1:8000/usuarios/me/contrasena',
+          {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              password_actual: passwordActual,
+              nueva_password: nuevaPassword
+            })
+          }
+        )
 
-      setNombre(datos.nombre)
-      setCorreo(datos.correo)
+        const datosPassword = await respuestaPassword.json()
 
-      // Actualizar localStorage
+        if (!respuestaPassword.ok) {
+          setError(
+            datosPassword.detail ||
+              'No se pudo cambiar la contraseña.'
+          )
+          setGuardando(false)
+          return
+        }
+      }
+
+      // =======================================================
+      // ACTUALIZAR DATOS LOCALES
+      // =======================================================
+      const usuarioActualizado = {
+        ...usuario,
+        nombre: nombre.trim(),
+        correo: correo.trim()
+      }
+
+      setUsuario(usuarioActualizado)
+
       localStorage.setItem(
         'usuario',
-        JSON.stringify(datos)
+        JSON.stringify(usuarioActualizado)
       )
 
+      // Limpiar campos de contraseña
+      setPasswordActual('')
+      setNuevaPassword('')
+      setConfirmarPassword('')
+
       setMensaje(
-        'Perfil actualizado correctamente'
+        quiereCambiarPassword
+          ? 'Perfil y contraseña actualizados correctamente.'
+          : 'Perfil actualizado correctamente.'
       )
 
       setEditando(false)
-
-    } catch (error) {
-      console.error(error)
-
-      setError(
-        'No se pudo conectar con el servidor'
-      )
-
+    } catch (err) {
+      console.error(err)
+      setError('No se pudo conectar con el servidor.')
     } finally {
       setGuardando(false)
     }
   }
 
-  // =====================================================
-  // CARGANDO
-  // =====================================================
+  // =========================================================
+  // CANCELAR EDICIÓN
+  // =========================================================
+  const cancelarEdicion = () => {
+    setNombre(usuario?.nombre || '')
+    setCorreo(usuario?.correo || '')
 
+    setPasswordActual('')
+    setNuevaPassword('')
+    setConfirmarPassword('')
+
+    setMensaje('')
+    setError('')
+
+    setEditando(false)
+  }
+
+  // =========================================================
+  // CARGANDO
+  // =========================================================
   if (cargando) {
     return (
-      <main className="perfil-page">
-
-        <div className="perfil-card">
-
-          <h2>Cargando perfil...</h2>
-
+      <div className="perfil-page">
+        <div className="perfil-loading">
+          <div className="perfil-spinner"></div>
+          <p>Cargando perfil...</p>
         </div>
-
-      </main>
+      </div>
     )
   }
 
-  // =====================================================
-  // NO HAY SESIÓN
-  // =====================================================
-
-  if (!usuario) {
+  // =========================================================
+  // ERROR
+  // =========================================================
+  if (error && !usuario) {
     return (
-      <main className="perfil-page">
+      <div className="perfil-page">
+        <div className="perfil-error">
+          <div className="perfil-error-icon">⚠️</div>
 
-        <div className="perfil-card perfil-login">
+          <h2>No se pudo cargar el perfil</h2>
 
-          <div className="perfil-icon">
-            👤
-          </div>
-
-          <h1>Sesión no iniciada</h1>
-
-          <p>
-            Debes iniciar sesión para ver tu perfil.
-          </p>
-
-          {error && (
-            <p className="perfil-error">
-              {error}
-            </p>
-          )}
+          <p>{error}</p>
 
           <button
+            type="button"
             onClick={() => navigate('/login')}
+            className="perfil-button perfil-button-primary"
           >
-            Iniciar sesión
+            Volver al inicio de sesión
           </button>
-
         </div>
-
-      </main>
+      </div>
     )
   }
 
-  // =====================================================
+  // =========================================================
   // PERFIL
-  // =====================================================
-
+  // =========================================================
   return (
-    <main className="perfil-page">
+    <div className="perfil-page">
 
-      <section className="perfil-card">
-
-        {/* HEADER */}
-
+      {/* =====================================================
+          ENCABEZADO
+      ===================================================== */}
+      <div className="perfil-banner">
         <div className="perfil-header">
 
           <div className="perfil-avatar">
-            {usuario.nombre?.charAt(0).toUpperCase()}
+            {(usuario?.nombre || 'U').charAt(0).toUpperCase()}
           </div>
 
-          <div>
-
-            <h1>
-              {usuario.nombre}
-            </h1>
+          <div className="perfil-header-info">
+            <h1>{usuario?.nombre || 'Usuario'}</h1>
 
             <span className="perfil-rol">
-              {usuario.es_admin
-                ? '👑 Administrador'
-                : '👤 Usuario'}
+              {usuario?.es_admin ? '👑 Administrador' : '👤 Usuario'}
             </span>
-
           </div>
 
         </div>
+      </div>
+
+      {/* =====================================================
+          CONTENIDO
+      ===================================================== */}
+      <div className="perfil-body">
 
         {/* MENSAJES */}
-
         {mensaje && (
-          <div className="perfil-success">
-            {mensaje}
+          <div className="perfil-message perfil-message-success">
+            <span>✅</span>
+            <span>{mensaje}</span>
           </div>
         )}
 
-        {error && (
-          <div className="perfil-error">
-            {error}
+        {error && usuario && (
+          <div className="perfil-message perfil-message-error">
+            <span>⚠️</span>
+            <span>{error}</span>
           </div>
         )}
 
-        {/* INFORMACIÓN */}
+        {/* ===================================================
+            MODO NORMAL
+        =================================================== */}
+        {!editando && (
+          <>
+            <div className="perfil-info">
 
-        {!editando ? (
+              <div className="perfil-item">
+                <span className="perfil-item-label">
+                  Nombre
+                </span>
 
-          <div className="perfil-info">
+                <strong>
+                  {usuario?.nombre || 'No registrado'}
+                </strong>
+              </div>
 
-            <div className="perfil-item">
+              <div className="perfil-item">
+                <span className="perfil-item-label">
+                  Correo electrónico
+                </span>
 
-              <span>
-                Nombre
-              </span>
+                <strong>
+                  {usuario?.correo || 'No registrado'}
+                </strong>
+              </div>
 
-              <strong>
-                {usuario.nombre}
-              </strong>
+              <div className="perfil-item">
+                <span className="perfil-item-label">
+                  Tipo de cuenta
+                </span>
 
-            </div>
-
-            <div className="perfil-item">
-
-              <span>
-                Correo electrónico
-              </span>
-
-              <strong>
-                {usuario.correo}
-              </strong>
-
-            </div>
-
-            <div className="perfil-item">
-
-              <span>
-                Tipo de cuenta
-              </span>
-
-              <strong>
-                {usuario.es_admin
-                  ? 'Administrador'
-                  : 'Usuario'}
-              </strong>
+                <strong>
+                  {usuario?.es_admin
+                    ? 'Administrador'
+                    : 'Usuario'}
+                </strong>
+              </div>
 
             </div>
 
-          </div>
+            {/* BOTÓN EDITAR */}
+            <div className="perfil-actions">
+              <button
+                type="button"
+                onClick={() => {
+                  setMensaje('')
+                  setError('')
+                  setEditando(true)
+                }}
+                className="perfil-button perfil-button-primary"
+              >
+                ✏️ Editar perfil
+              </button>
+            </div>
+          </>
+        )}
 
-        ) : (
-
+        {/* ===================================================
+            MODO EDICIÓN
+        =================================================== */}
+        {editando && (
           <form
             className="perfil-form"
-            onSubmit={actualizarPerfil}
+            onSubmit={guardarCambios}
           >
 
-            <div className="form-group">
+            <div className="perfil-section-heading">
+              <div>
+                <h2>Editar perfil</h2>
+                <p>
+                  Actualiza tus datos personales y,
+                  si quieres, cambia tu contraseña.
+                </p>
+              </div>
+            </div>
 
-              <label>
+            {/* NOMBRE */}
+            <div className="form-group">
+              <label htmlFor="perfil-nombre">
                 Nombre
               </label>
 
               <input
+                id="perfil-nombre"
                 type="text"
                 value={nombre}
-                onChange={(e) =>
-                  setNombre(e.target.value)
-                }
-                required
+                onChange={(e) => setNombre(e.target.value)}
+                placeholder="Tu nombre"
               />
-
             </div>
 
+            {/* CORREO */}
             <div className="form-group">
-
-              <label>
+              <label htmlFor="perfil-correo">
                 Correo electrónico
               </label>
 
               <input
+                id="perfil-correo"
                 type="email"
                 value={correo}
-                onChange={(e) =>
-                  setCorreo(e.target.value)
-                }
-                required
+                onChange={(e) => setCorreo(e.target.value)}
+                placeholder="Tu correo electrónico"
               />
-
             </div>
 
-            <div className="perfil-edit-actions">
+            {/* =================================================
+                CAMBIO DE CONTRASEÑA
+            ================================================= */}
+            <div className="perfil-security-card">
+
+              <div className="perfil-section-heading">
+                <div>
+                  <h2>🔐 Cambiar contraseña</h2>
+                  <p>
+                    Déjalos vacíos si no deseas cambiar
+                    tu contraseña.
+                  </p>
+                </div>
+              </div>
+
+              <div className="perfil-password-options">
+
+                <div className="form-group">
+                  <label htmlFor="password-actual">
+                    Contraseña actual
+                  </label>
+
+                  <input
+                    id="password-actual"
+                    type="password"
+                    value={passwordActual}
+                    onChange={(e) =>
+                      setPasswordActual(e.target.value)
+                    }
+                    placeholder="Tu contraseña actual"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="nueva-password">
+                    Nueva contraseña
+                  </label>
+
+                  <input
+                    id="nueva-password"
+                    type="password"
+                    value={nuevaPassword}
+                    onChange={(e) =>
+                      setNuevaPassword(e.target.value)
+                    }
+                    placeholder="Mínimo 8 caracteres"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="confirmar-password">
+                    Confirmar nueva contraseña
+                  </label>
+
+                  <input
+                    id="confirmar-password"
+                    type="password"
+                    value={confirmarPassword}
+                    onChange={(e) =>
+                      setConfirmarPassword(e.target.value)
+                    }
+                    placeholder="Repite la nueva contraseña"
+                  />
+                </div>
+
+              </div>
+            </div>
+
+            {/* BOTONES */}
+            <div className="perfil-actions">
 
               <button
                 type="submit"
                 disabled={guardando}
+                className="perfil-button perfil-button-primary"
               >
                 {guardando
                   ? 'Guardando...'
@@ -352,13 +527,9 @@ function Perfil() {
 
               <button
                 type="button"
-                onClick={() => {
-                  setNombre(usuario.nombre)
-                  setCorreo(usuario.correo)
-                  setEditando(false)
-                  setError('')
-                  setMensaje('')
-                }}
+                onClick={cancelarEdicion}
+                disabled={guardando}
+                className="perfil-button perfil-button-secondary"
               >
                 Cancelar
               </button>
@@ -366,43 +537,47 @@ function Perfil() {
             </div>
 
           </form>
-
         )}
 
-        {/* ACCIONES */}
-
-        <div className="perfil-actions">
-
-          {!editando && (
-            <button
-              onClick={() => {
-                setEditando(true)
-                setMensaje('')
-                setError('')
-              }}
-            >
-              ✏️ Editar perfil
-            </button>
-          )}
+        {/* =====================================================
+            ACCIONES RÁPIDAS
+        ===================================================== */}
+        <div className="perfil-shortcuts">
 
           <button
+            type="button"
             onClick={() => navigate('/mis-puntos')}
+            className="perfil-shortcut"
           >
-            📍 Mis puntos
+            <span>📍</span>
+            <div>
+              <strong>Mis puntos</strong>
+              <small>
+                Consulta los puntos que has propuesto
+              </small>
+            </div>
           </button>
 
           <button
+            type="button"
             onClick={() => navigate('/mapa')}
+            className="perfil-shortcut"
           >
-            🗺️ Ver mapa
+            <span>🗺️</span>
+            <div>
+              <strong>Ver mapa</strong>
+              <small>
+                Explora los puntos ecológicos
+              </small>
+            </div>
           </button>
 
         </div>
 
-      </section>
-
-    </main>
+      </div>
+    </div>
   )
 }
 
 export default Perfil
+

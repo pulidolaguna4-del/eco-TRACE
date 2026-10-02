@@ -228,7 +228,9 @@ function LoadingButton({
 // =========================================================
 
 function Admin() {
+
   const navigate = useNavigate()
+
   const prefiereReducido = useReducedMotion()
 
   const [puntosPendientes, setPuntosPendientes] =
@@ -239,6 +241,17 @@ function Admin() {
 
   const [puntosAprobados, setPuntosAprobados] =
     useState([])
+
+  const [todosLosPuntos, setTodosLosPuntos] =
+    useState([])
+
+  const [puntoEliminandoId, setPuntoEliminandoId] =
+    useState(null)
+
+  // Reportes enviados por la comunidad sobre puntos ecológicos.
+  const [reportes, setReportes] = useState([])
+  const [observacionesReportes, setObservacionesReportes] = useState({})
+  const [reporteProcesandoId, setReporteProcesandoId] = useState(null)
 
   const [cargando, setCargando] =
     useState(true)
@@ -378,7 +391,8 @@ function Admin() {
       const datosPendientes =
         await resPendientes.json()
 
-      const pendientesNormalizados = datosPendientes.map(normalizarPunto)
+      const pendientesNormalizados =
+        datosPendientes.map(normalizarPunto)
 
       setPuntosPendientes(
         pendientesNormalizados
@@ -431,14 +445,108 @@ function Admin() {
         const datosAprobados =
           await resAprobados.json()
 
-        const aprobadosNormalizados = datosAprobados.map(normalizarPunto)
+        const aprobadosNormalizados =
+          datosAprobados.map(normalizarPunto)
 
         setPuntosAprobados(
           aprobadosNormalizados
         )
       }
 
+      // -----------------------------------------------------
+      // TODOS LOS PUNTOS - ADMIN
+      // -----------------------------------------------------
+
+      const resTodosLosPuntos =
+        await fetch(
+          `${API_URL}/admin/puntos`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        )
+
+      if (
+        resTodosLosPuntos.status === 401 ||
+        resTodosLosPuntos.status === 403
+      ) {
+        throw new Error(
+          'No tienes autorización para consultar todos los puntos'
+        )
+      }
+
+      if (!resTodosLosPuntos.ok) {
+        throw new Error(
+          'Error al cargar todos los puntos'
+        )
+      }
+
+      const datosTodosLosPuntos =
+        await resTodosLosPuntos.json()
+
+      const puntosNormalizados =
+        datosTodosLosPuntos.map(normalizarPunto)
+
+      setTodosLosPuntos(
+        puntosNormalizados
+      )
+
+      // -----------------------------------------------------
+      // REPORTES DE LA COMUNIDAD
+      // -----------------------------------------------------
+
+      try {
+        const resReportes = await fetch(
+          `${API_URL}/admin/reportes`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        )
+
+        if (!resReportes.ok) {
+          let detalle = null
+
+          try {
+            detalle = await resReportes.json()
+          } catch {
+            detalle = null
+          }
+
+          throw new Error(
+            detalle?.detail ||
+            'No se pudieron cargar los reportes'
+          )
+        }
+
+        const datosReportes =
+          await resReportes.json()
+
+        setReportes(
+          Array.isArray(datosReportes)
+            ? datosReportes
+            : []
+        )
+
+      } catch (errorReportes) {
+
+        console.error(
+          'Error cargando reportes:',
+          errorReportes
+        )
+
+        setReportes([])
+
+        setError((mensajeActual) =>
+          mensajeActual ||
+          `${errorReportes.message}. Verifica que la ruta /admin/reportes esté implementada en el backend.`
+        )
+      }
+
     } catch (err) {
+
       console.error(
         'Error cargando dashboard:',
         err
@@ -462,6 +570,7 @@ function Admin() {
     puntoId,
     accion
   ) => {
+
     const token =
       localStorage.getItem('access_token')
 
@@ -473,6 +582,7 @@ function Admin() {
     }
 
     try {
+
       setProcesandoId(puntoId)
       setError('')
       setMensaje('')
@@ -503,16 +613,24 @@ function Admin() {
         )
       }
 
+      // -----------------------------------------------------
+      // ACTUALIZAR PUNTO APROBADO
+      // -----------------------------------------------------
+
       if (accion === 'aprobar') {
+
         setMensaje(
           'Punto aprobado correctamente'
         )
 
         if (datos) {
-          const puntoNorm = normalizarPunto(datos)
+
+          const puntoNorm =
+            normalizarPunto(datos)
 
           setPuntosAprobados(
             (prev) => {
+
               const yaExiste =
                 prev.some(
                   (punto) =>
@@ -529,14 +647,51 @@ function Admin() {
               ]
             }
           )
+
+          // Actualizar también la pestaña
+          // "Todos los puntos".
+          setTodosLosPuntos(
+            (prev) =>
+              prev.map(
+                (punto) =>
+                  punto.id === puntoNorm.id
+                    ? puntoNorm
+                    : punto
+              )
+          )
         }
       }
 
+      // -----------------------------------------------------
+      // ACTUALIZAR PUNTO RECHAZADO
+      // -----------------------------------------------------
+
       if (accion === 'rechazar') {
+
         setMensaje(
           'Punto rechazado correctamente'
         )
+
+        if (datos) {
+
+          const puntoNorm =
+            normalizarPunto(datos)
+
+          setTodosLosPuntos(
+            (prev) =>
+              prev.map(
+                (punto) =>
+                  punto.id === puntoNorm.id
+                    ? puntoNorm
+                    : punto
+              )
+          )
+        }
       }
+
+      // -----------------------------------------------------
+      // QUITAR DE PENDIENTES
+      // -----------------------------------------------------
 
       setPuntosPendientes(
         (puntosActuales) =>
@@ -547,6 +702,7 @@ function Admin() {
       )
 
     } catch (err) {
+
       console.error(
         'Error cambiando estado:',
         err
@@ -563,12 +719,291 @@ function Admin() {
   }
 
   // =========================================================
+  // ELIMINAR PUNTO
+  // =========================================================
+
+  const eliminarPunto = async (
+    puntoId
+  ) => {
+
+    const token =
+      localStorage.getItem('access_token')
+
+    if (!token) {
+      setError(
+        'Tu sesión ha expirado'
+      )
+      return
+    }
+
+    const punto =
+      todosLosPuntos.find(
+        (item) =>
+          item.id === puntoId
+      )
+
+    const confirmar =
+      window.confirm(
+        `¿Seguro que quieres eliminar el punto "${punto?.nombre || 'este punto'}"?\n\nTambién se eliminarán los reportes, entregas y relaciones con categorías asociadas a este punto.`
+      )
+
+    if (!confirmar) {
+      return
+    }
+
+    try {
+
+      setPuntoEliminandoId(puntoId)
+      setError('')
+      setMensaje('')
+
+      const respuesta =
+        await fetch(
+          `${API_URL}/admin/puntos/${puntoId}`,
+          {
+            method: 'DELETE',
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        )
+
+      let datos = null
+
+      try {
+        datos = await respuesta.json()
+      } catch {
+        datos = null
+      }
+
+      if (!respuesta.ok) {
+        throw new Error(
+          datos?.detail ||
+          'No se pudo eliminar el punto'
+        )
+      }
+
+      // -----------------------------------------------------
+      // QUITAR EL PUNTO DE TODOS LOS PUNTOS
+      // -----------------------------------------------------
+
+      setTodosLosPuntos(
+        (puntosActuales) =>
+          puntosActuales.filter(
+            (puntoActual) =>
+              puntoActual.id !== puntoId
+          )
+      )
+
+      // -----------------------------------------------------
+      // QUITAR EL PUNTO DE PENDIENTES
+      // -----------------------------------------------------
+
+      setPuntosPendientes(
+        (puntosActuales) =>
+          puntosActuales.filter(
+            (puntoActual) =>
+              puntoActual.id !== puntoId
+          )
+      )
+
+      // -----------------------------------------------------
+      // QUITAR EL PUNTO DE APROBADOS
+      // -----------------------------------------------------
+
+      setPuntosAprobados(
+        (puntosActuales) =>
+          puntosActuales.filter(
+            (puntoActual) =>
+              puntoActual.id !== puntoId
+          )
+      )
+
+      // -----------------------------------------------------
+      // QUITAR REPORTES DEL PUNTO DE LA VISTA
+      // -----------------------------------------------------
+
+      setReportes(
+        (reportesActuales) =>
+          reportesActuales.filter(
+            (reporte) =>
+              reporte.punto_id !== puntoId
+          )
+      )
+
+      setMensaje(
+        datos?.mensaje ||
+        'Punto eliminado correctamente'
+      )
+
+    } catch (err) {
+
+      console.error(
+        'Error eliminando punto:',
+        err
+      )
+
+      setError(
+        err.message ||
+        'No se pudo eliminar el punto'
+      )
+
+    } finally {
+      setPuntoEliminandoId(null)
+    }
+  }
+
+  // =========================================================
+  // REVISAR / DESCARTAR REPORTE
+  // =========================================================
+
+  const revisarReporte = async (
+    reporteId,
+    estado
+  ) => {
+
+    const token =
+      localStorage.getItem('access_token')
+
+    if (!token) {
+      setError(
+        'Tu sesión ha expirado'
+      )
+      return
+    }
+
+    if (
+      !['revisado', 'descartado']
+        .includes(estado)
+    ) {
+      setError(
+        'El estado solicitado para el reporte no es válido'
+      )
+      return
+    }
+
+    try {
+
+      setReporteProcesandoId(
+        reporteId
+      )
+
+      setError('')
+      setMensaje('')
+
+      const respuesta =
+        await fetch(
+          `${API_URL}/admin/reportes/${reporteId}/revisar`,
+          {
+            method: 'PUT',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              estado,
+              observacion_admin:
+                (
+                  observacionesReportes[
+                    reporteId
+                  ] || ''
+                ).trim() || null
+            })
+          }
+        )
+
+      let datos = null
+
+      try {
+        datos = await respuesta.json()
+      } catch {
+        datos = null
+      }
+
+      if (!respuesta.ok) {
+        throw new Error(
+          datos?.detail ||
+          'No se pudo actualizar el reporte'
+        )
+      }
+
+      setReportes(
+        (actuales) =>
+          actuales.map(
+            (reporte) => {
+
+              const idActual =
+                reporte.id ??
+                reporte.reporte_id
+
+              if (
+                idActual !== reporteId
+              ) {
+                return reporte
+              }
+
+              return {
+                ...reporte,
+                ...(datos &&
+                typeof datos === 'object'
+                  ? datos
+                  : {}),
+                estado,
+                observacion_admin:
+                  (
+                    observacionesReportes[
+                      reporteId
+                    ] || ''
+                  ).trim() || null
+              }
+            }
+          )
+      )
+
+      setObservacionesReportes(
+        (actuales) => {
+
+          const nuevas = {
+            ...actuales
+          }
+
+          delete nuevas[reporteId]
+
+          return nuevas
+        }
+      )
+
+      setMensaje(
+        estado === 'revisado'
+          ? 'Reporte marcado como revisado correctamente'
+          : 'Reporte descartado correctamente'
+      )
+
+    } catch (err) {
+
+      console.error(
+        'Error revisando reporte:',
+        err
+      )
+
+      setError(
+        err.message ||
+        'No se pudo actualizar el reporte'
+      )
+
+    } finally {
+      setReporteProcesandoId(null)
+    }
+  }
+
+  // =========================================================
   // CAMBIAR ADMIN
   // =========================================================
 
   const cambiarAdministrador = async (
     usuarioId
   ) => {
+
     const token =
       localStorage.getItem('access_token')
 
@@ -587,7 +1022,11 @@ function Admin() {
     }
 
     try {
-      setUsuarioProcesandoId(usuarioId)
+
+      setUsuarioProcesandoId(
+        usuarioId
+      )
+
       setError('')
       setMensaje('')
 
@@ -629,6 +1068,7 @@ function Admin() {
       )
 
     } catch (err) {
+
       console.error(err)
 
       setError(
@@ -637,7 +1077,9 @@ function Admin() {
       )
 
     } finally {
-      setUsuarioProcesandoId(null)
+      setUsuarioProcesandoId(
+        null
+      )
     }
   }
 
@@ -648,6 +1090,7 @@ function Admin() {
   const eliminarUsuario = async (
     usuarioId
   ) => {
+
     const token =
       localStorage.getItem('access_token')
 
@@ -667,7 +1110,8 @@ function Admin() {
 
     const usuario =
       usuarios.find(
-        (item) => item.id === usuarioId
+        (item) =>
+          item.id === usuarioId
       )
 
     const confirmar =
@@ -680,7 +1124,11 @@ function Admin() {
     }
 
     try {
-      setUsuarioProcesandoId(usuarioId)
+
+      setUsuarioProcesandoId(
+        usuarioId
+      )
+
       setError('')
       setMensaje('')
 
@@ -734,11 +1182,37 @@ function Admin() {
           )
       )
 
+      // Quitar también los puntos del usuario
+      // de la pestaña "Todos los puntos".
+      setTodosLosPuntos(
+        (puntosActuales) =>
+          puntosActuales.filter(
+            (punto) =>
+              punto.usuario_id !== usuarioId
+          )
+      )
+
+      // Evita dejar reportes huérfanos visualmente
+      // después de que el backend confirme la eliminación.
+      setReportes(
+        (reportesActuales) =>
+          reportesActuales.filter(
+            (reporte) =>
+              (
+                reporte.usuario_id ??
+                reporte.reportante_id ??
+                reporte.usuario?.id ??
+                reporte.reportante?.id
+              ) !== usuarioId
+          )
+      )
+
       setMensaje(
         'Usuario eliminado correctamente'
       )
 
     } catch (err) {
+
       console.error(err)
 
       setError(
@@ -747,7 +1221,9 @@ function Admin() {
       )
 
     } finally {
-      setUsuarioProcesandoId(null)
+      setUsuarioProcesandoId(
+        null
+      )
     }
   }
 
@@ -782,18 +1258,22 @@ function Admin() {
   const porcentajeAprobados =
     totalPuntosSum > 0
       ? Math.round(
-          (puntosAprobados.length /
-            totalPuntosSum) *
-            100
+          (
+            puntosAprobados.length /
+            totalPuntosSum
+          ) *
+          100
         )
       : 0
 
   const porcentajePendientes =
     totalPuntosSum > 0
       ? Math.round(
-          (puntosPendientes.length /
-            totalPuntosSum) *
-            100
+          (
+            puntosPendientes.length /
+            totalPuntosSum
+          ) *
+          100
         )
       : 0
 
@@ -895,9 +1375,6 @@ function Admin() {
 
             <div className="flex items-center gap-2">
 
-
-
-
             </div>
 
             <p className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-1 font-medium">
@@ -911,6 +1388,8 @@ function Admin() {
             {/* TABS */}
 
             <div className="bg-gray-100 dark:bg-[#121816] p-1 rounded-xl flex items-center gap-1 flex-wrap">
+
+              {/* PENDIENTES */}
 
               <button
                 type="button"
@@ -936,6 +1415,36 @@ function Admin() {
                 )}
               </button>
 
+              {/* =================================================
+                  PUNTOS
+              ================================================== */}
+
+              <button
+                type="button"
+                onClick={() =>
+                  setPestañaActiva(
+                    'puntos'
+                  )
+                }
+                className={`px-3.5 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center gap-1.5 ${
+                  pestañaActiva ===
+                  'puntos'
+                    ? 'bg-white dark:bg-[#1a2320] text-[#218739] dark:text-[#2fa350] shadow-2xs'
+                    : 'text-gray-500 dark:text-[#a8b3ae]'
+                }`}
+              >
+                📍 Puntos
+
+                {todosLosPuntos.length >
+                  0 && (
+                  <span className="bg-[#218739] text-white text-[10px] px-1.5 py-0.2 rounded-full font-black">
+                    {todosLosPuntos.length}
+                  </span>
+                )}
+              </button>
+
+              {/* USUARIOS */}
+
               <button
                 type="button"
                 onClick={() =>
@@ -959,6 +1468,47 @@ function Admin() {
                   </span>
                 )}
               </button>
+
+              {/* REPORTES */}
+
+              <button
+                type="button"
+                onClick={() =>
+                  setPestañaActiva(
+                    'reportes'
+                  )
+                }
+                className={`px-3.5 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center gap-1.5 ${
+                  pestañaActiva ===
+                  'reportes'
+                    ? 'bg-white dark:bg-[#1a2320] text-[#218739] dark:text-[#2fa350] shadow-2xs'
+                    : 'text-gray-500 dark:text-[#a8b3ae]'
+                }`}
+              >
+                🚩 Reportes
+
+                {reportes.filter(
+                  (reporte) =>
+                    (
+                      reporte.estado ||
+                      'pendiente'
+                    ) === 'pendiente'
+                ).length > 0 && (
+                  <span className="bg-red-600 text-white text-[10px] px-1.5 py-0.2 rounded-full font-black">
+                    {
+                      reportes.filter(
+                        (reporte) =>
+                          (
+                            reporte.estado ||
+                            'pendiente'
+                          ) === 'pendiente'
+                      ).length
+                    }
+                  </span>
+                )}
+              </button>
+
+              {/* RESUMEN */}
 
               <button
                 type="button"
@@ -1145,11 +1695,317 @@ function Admin() {
         </section>
 
         {/* =====================================================
-            PESTAÑA USUARIOS
+            PESTAÑA PUNTOS
         ===================================================== */}
 
-        {pestañaActiva ===
+        {pestañaActiva === 'puntos' ? (
+
+          <section className="bg-white dark:bg-[#1a2320] rounded-3xl border border-gray-100 dark:border-gray-800/40 shadow-xs overflow-hidden">
+
+            <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-800/40 bg-gray-50/30 dark:bg-[#121816]/30">
+
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+
+                <div>
+
+                  <h3 className="text-base font-extrabold text-gray-800 dark:text-[#f2f5f3]">
+                    Todos los puntos ecológicos
+                  </h3>
+
+                  <p className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-1">
+                    Consulta y administra todos los puntos registrados en Eco-TRACE.
+                  </p>
+
+                </div>
+
+                <Badge
+                  tipo="info"
+                  texto={`${todosLosPuntos.length} puntos`}
+                />
+
+              </div>
+
+            </div>
+
+            {cargando ? (
+
+              <div className="p-8 text-center text-sm text-gray-400">
+                ⏳ Cargando puntos...
+              </div>
+
+            ) : todosLosPuntos.length === 0 ? (
+
+              <EmptyState
+                titulo="No hay puntos registrados"
+                descripcion="Actualmente no existen puntos ecológicos registrados en el sistema."
+                icono="📍"
+              />
+
+            ) : (
+
+              <div className="overflow-x-auto">
+
+                <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800/40">
+
+                  <thead>
+
+                    <tr className="bg-gray-50/30 dark:bg-[#121816]/30 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">
+
+                      <th className="px-6 py-4">
+                        Punto
+                      </th>
+
+                      <th className="px-6 py-4">
+                        Ubicación
+                      </th>
+
+                      <th className="px-6 py-4">
+                        Categorías
+                      </th>
+
+                      <th className="px-6 py-4">
+                        Estado
+                      </th>
+
+                      <th className="px-6 py-4">
+                        Creador
+                      </th>
+
+                      <th className="px-6 py-4 text-right">
+                        Acciones
+                      </th>
+
+                    </tr>
+
+                  </thead>
+
+                  <motion.tbody
+                    variants={contenedorVariantes}
+                    initial="oculto"
+                    animate="visible"
+                    className="divide-y divide-gray-100 dark:divide-gray-800/40"
+                  >
+
+                    <AnimatePresence>
+
+                      {todosLosPuntos.map(
+                        (punto) => {
+
+                          const creador =
+                            obtenerCreador(
+                              punto.usuario_id
+                            )
+
+                          const eliminando =
+                            puntoEliminandoId ===
+                            punto.id
+
+                          return (
+
+                            <motion.tr
+                              key={punto.id}
+                              variants={
+                                elementoVariantes
+                              }
+                              initial="oculto"
+                              animate="visible"
+                              exit="salida"
+                              className="hover:bg-gray-50/30 dark:hover:bg-gray-800/20"
+                            >
+
+                              {/* PUNTO */}
+
+                              <td className="px-6 py-4">
+
+                                <div className="flex items-start gap-3">
+
+                                  <div className="w-9 h-9 rounded-xl bg-[#f1f8f4] dark:bg-[#0f1512] flex items-center justify-center text-[#218739] dark:text-[#2fa350] font-black shrink-0">
+                                    📍
+                                  </div>
+
+                                  <div className="min-w-0">
+
+                                    <div className="text-sm font-extrabold text-gray-800 dark:text-[#f2f5f3]">
+                                      {punto.nombre}
+                                    </div>
+
+                                    <div className="text-[10px] text-gray-400 font-mono mt-1">
+                                      ID: {punto.id}
+                                    </div>
+
+                                    <p
+                                      className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-2 max-w-xs"
+                                      title={punto.descripcion}
+                                    >
+                                      {punto.descripcion}
+                                    </p>
+
+                                  </div>
+
+                                </div>
+
+                              </td>
+
+                              {/* UBICACIÓN */}
+
+                              <td className="px-6 py-4">
+
+                                <div className="text-xs text-gray-800 dark:text-[#f2f5f3] font-bold">
+                                  {punto.direccion}
+                                </div>
+
+                                <div className="text-[11px] text-gray-400 mt-0.5">
+                                  {punto.localidad}
+                                </div>
+
+                                <div className="text-[10px] text-gray-400 font-mono mt-1">
+                                  {Number(
+                                    punto.latitud
+                                  ).toFixed(5)}
+                                  {', '}
+                                  {Number(
+                                    punto.longitud
+                                  ).toFixed(5)}
+                                </div>
+
+                              </td>
+
+                              {/* CATEGORÍAS */}
+
+                              <td className="px-6 py-4">
+
+                                <div className="flex flex-wrap gap-1.5 max-w-xs">
+
+                                  {punto.categorias?.map(
+                                    (
+                                      categoria,
+                                      index
+                                    ) => (
+                                      <span
+                                        key={`${punto.id}-${index}`}
+                                        className="text-[10px] font-bold px-2 py-1 rounded-full bg-gray-100 dark:bg-[#121816] text-gray-600 dark:text-[#b9c5c0]"
+                                      >
+                                        {categoria}
+                                      </span>
+                                    )
+                                  )}
+
+                                </div>
+
+                              </td>
+
+                              {/* ESTADO */}
+
+                              <td className="px-6 py-4 whitespace-nowrap">
+
+                                <Badge
+                                  tipo={
+                                    punto.estado ===
+                                    'aprobado'
+                                      ? 'aprobado'
+                                      : punto.estado ===
+                                        'rechazado'
+                                        ? 'rechazado'
+                                        : 'pendiente'
+                                  }
+                                  texto={
+                                    punto.estado
+                                  }
+                                />
+
+                                {punto.motivo_rechazo && (
+                                  <p className="text-[10px] text-red-500 mt-2 max-w-xs">
+                                    Motivo: {punto.motivo_rechazo}
+                                  </p>
+                                )}
+
+                              </td>
+
+                              {/* CREADOR */}
+
+                              <td className="px-6 py-4 whitespace-nowrap">
+
+                                {creador ? (
+
+                                  <div>
+
+                                    <div className="text-xs font-bold text-gray-800 dark:text-[#f2f5f3]">
+                                      {creador.nombre}
+                                    </div>
+
+                                    <div className="text-[11px] text-gray-400 mt-0.5">
+                                      {creador.correo}
+                                    </div>
+
+                                    <div className="text-[10px] text-gray-400 mt-0.5">
+                                      ID: {creador.id}
+                                    </div>
+
+                                  </div>
+
+                                ) : (
+
+                                  <span className="text-xs text-gray-500">
+                                    Usuario #{punto.usuario_id}
+                                  </span>
+
+                                )}
+
+                              </td>
+
+                              {/* ACCIONES */}
+
+                              <td className="px-6 py-4 whitespace-nowrap">
+
+                                <div className="flex items-center justify-end">
+
+                                  <LoadingButton
+                                    cargando={
+                                      eliminando
+                                    }
+                                    texto="🗑️ Eliminar"
+                                    textoCargando="Eliminando..."
+                                    variante="peligro"
+                                    onClick={() =>
+                                      eliminarPunto(
+                                        punto.id
+                                      )
+                                    }
+                                    deshabilitado={
+                                      puntoEliminandoId !==
+                                        null &&
+                                      !eliminando
+                                    }
+                                  />
+
+                                </div>
+
+                              </td>
+
+                            </motion.tr>
+
+                          )
+                        }
+                      )}
+
+                    </AnimatePresence>
+
+                  </motion.tbody>
+
+                </table>
+
+              </div>
+
+            )}
+
+          </section>
+
+        ) : pestañaActiva ===
         'usuarios' ? (
+
+          /* =====================================================
+             PESTAÑA USUARIOS
+          ===================================================== */
 
           <section className="bg-white dark:bg-[#1a2320] rounded-3xl border border-gray-100 dark:border-gray-800/40 shadow-xs overflow-hidden">
 
@@ -1158,6 +2014,7 @@ function Admin() {
               <div className="flex items-center justify-between gap-4">
 
                 <div>
+
                   <h3 className="text-base font-extrabold text-gray-800 dark:text-[#f2f5f3]">
                     Usuarios registrados
                   </h3>
@@ -1165,6 +2022,7 @@ function Admin() {
                   <p className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-1">
                     Administra los usuarios registrados en Eco-TRACE.
                   </p>
+
                 </div>
 
                 <Badge
@@ -1237,13 +2095,15 @@ function Admin() {
                         (usuario) => {
 
                           const esMiCuenta =
-                            usuario.id === miUsuarioId
+                            usuario.id ===
+                            miUsuarioId
 
                           const procesando =
                             usuarioProcesandoId ===
                             usuario.id
 
                           return (
+
                             <motion.tr
                               key={usuario.id}
                               variants={
@@ -1274,6 +2134,7 @@ function Admin() {
                                   </div>
 
                                   <div>
+
                                     <div className="text-xs font-extrabold text-gray-800 dark:text-[#f2f5f3]">
                                       {usuario.nombre}
                                     </div>
@@ -1283,6 +2144,7 @@ function Admin() {
                                         Tu cuenta
                                       </span>
                                     )}
+
                                   </div>
 
                                 </div>
@@ -1366,6 +2228,7 @@ function Admin() {
                               </td>
 
                             </motion.tr>
+
                           )
                         }
                       )}
@@ -1375,6 +2238,305 @@ function Admin() {
                   </motion.tbody>
 
                 </table>
+
+              </div>
+
+            )}
+
+          </section>
+
+        ) : pestañaActiva ===
+          'reportes' ? (
+
+          /* =====================================================
+             PESTAÑA REPORTES
+          ===================================================== */
+
+          <section className="bg-white dark:bg-[#1a2320] rounded-3xl border border-gray-100 dark:border-gray-800/40 shadow-xs overflow-hidden">
+
+            <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-800/40 bg-gray-50/30 dark:bg-[#121816]/30">
+
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+
+                <div>
+
+                  <h3 className="text-base font-extrabold text-gray-800 dark:text-[#f2f5f3]">
+                    Reportes de puntos ecológicos
+                  </h3>
+
+                  <p className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-1">
+                    Revisa los avisos enviados por la comunidad y registra la decisión administrativa.
+                  </p>
+
+                </div>
+
+                <Badge
+                  tipo="pendiente"
+                  texto={`${reportes.filter((reporte) => (reporte.estado || 'pendiente') === 'pendiente').length} pendientes`}
+                />
+
+              </div>
+
+            </div>
+
+            {cargando ? (
+
+              <div className="p-8 text-center text-sm text-gray-400">
+                ⏳ Cargando reportes...
+              </div>
+
+            ) : reportes.length === 0 ? (
+
+              <EmptyState
+                titulo="No hay reportes"
+                descripcion="Todavía no hay reportes registrados o la ruta de reportes no está disponible."
+                icono="🚩"
+              />
+
+            ) : (
+
+              <div className="divide-y divide-gray-100 dark:divide-gray-800/40">
+
+                {reportes.map(
+                  (reporte) => {
+
+                    const reporteId =
+                      reporte.id ??
+                      reporte.reporte_id
+
+                    const estadoReporte =
+                      reporte.estado ||
+                      'pendiente'
+
+                    const pendiente =
+                      estadoReporte ===
+                      'pendiente'
+
+                    const nombrePunto =
+                      reporte.punto_nombre ||
+                      reporte.nombre_punto ||
+                      reporte.punto?.nombre ||
+                      `Punto #${reporte.punto_id ?? '—'}`
+
+                    const nombreReportante =
+                      reporte.usuario_nombre ||
+                      reporte.reportante_nombre ||
+                      reporte.reportante?.nombre ||
+                      reporte.usuario?.nombre ||
+                      `Usuario #${reporte.usuario_id ?? '—'}`
+
+                    const correoReportante =
+                      reporte.usuario_correo ||
+                      reporte.reportante_correo ||
+                      reporte.reportante?.correo ||
+                      reporte.usuario?.correo ||
+                      ''
+
+                    const motivo =
+                      reporte.motivo ||
+                      'Sin motivo indicado'
+
+                    const fecha =
+                      reporte.fecha_creacion ||
+                      reporte.fecha ||
+                      reporte.created_at
+
+                    const fechaLegible =
+                      fecha
+                        ? new Date(
+                            fecha
+                          ).toLocaleString(
+                            'es-CO',
+                            {
+                              dateStyle:
+                                'medium',
+                              timeStyle:
+                                'short'
+                            }
+                          )
+                        : 'Fecha no disponible'
+
+                    const procesandoReporte =
+                      reporteProcesandoId ===
+                      reporteId
+
+                    return (
+
+                      <article
+                        key={reporteId}
+                        className="p-5 sm:p-6 space-y-4"
+                      >
+
+                        <div className="flex items-start justify-between gap-3 flex-wrap">
+
+                          <div>
+
+                            <h4 className="text-sm font-extrabold text-gray-900 dark:text-[#f2f5f3]">
+                              {nombrePunto}
+                            </h4>
+
+                            <p className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-1">
+
+                              Reportado por{' '}
+
+                              <span className="font-bold">
+                                {nombreReportante}
+                              </span>
+
+                              {correoReportante
+                                ? ` · ${correoReportante}`
+                                : ''}
+
+                            </p>
+
+                            <p className="text-[11px] text-gray-400 mt-1">
+                              Fecha: {fechaLegible}
+                            </p>
+
+                          </div>
+
+                          <Badge
+                            tipo={
+                              estadoReporte ===
+                              'revisado'
+                                ? 'aprobado'
+                                : estadoReporte ===
+                                  'descartado'
+                                  ? 'rechazado'
+                                  : 'pendiente'
+                            }
+                            texto={
+                              estadoReporte
+                            }
+                          />
+
+                        </div>
+
+                        <div className="rounded-xl bg-gray-50 dark:bg-[#121816] p-4">
+
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">
+                            Motivo del reporte
+                          </p>
+
+                          <p className="text-sm text-gray-700 dark:text-[#f2f5f3] whitespace-pre-wrap break-words">
+                            {motivo}
+                          </p>
+
+                        </div>
+
+                        {reporte.observacion_admin && (
+
+                          <div className="rounded-xl border border-gray-100 dark:border-gray-800/40 p-3">
+
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">
+                              Observación administrativa
+                            </p>
+
+                            <p className="text-xs text-gray-600 dark:text-[#a8b3ae] whitespace-pre-wrap break-words">
+                              {reporte.observacion_admin}
+                            </p>
+
+                          </div>
+
+                        )}
+
+                        {pendiente && (
+
+                          <div className="space-y-3">
+
+                            <label className="block">
+
+                              <span className="block text-xs font-bold text-gray-600 dark:text-[#a8b3ae] mb-1.5">
+                                Observación administrativa (opcional)
+                              </span>
+
+                              <textarea
+                                value={
+                                  observacionesReportes[
+                                    reporteId
+                                  ] || ''
+                                }
+                                onChange={(
+                                  evento
+                                ) =>
+                                  setObservacionesReportes(
+                                    (
+                                      actuales
+                                    ) => ({
+                                      ...actuales,
+                                      [reporteId]:
+                                        evento
+                                          .target
+                                          .value
+                                    })
+                                  )
+                                }
+                                rows={2}
+                                maxLength={1000}
+                                placeholder="Añade una nota sobre la decisión, si es necesario..."
+                                disabled={
+                                  procesandoReporte
+                                }
+                                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#0f1512] text-sm text-gray-800 dark:text-[#f2f5f3] placeholder:text-gray-400 p-3 outline-none focus:ring-2 focus:ring-[#218739]/30 focus:border-[#218739] disabled:opacity-50"
+                              />
+
+                            </label>
+
+                            <div className="flex flex-wrap justify-end gap-2">
+
+                              <LoadingButton
+                                cargando={
+                                  procesandoReporte
+                                }
+                                texto="Marcar como revisado"
+                                textoCargando="Guardando..."
+                                variante="primario"
+                                onClick={() =>
+                                  revisarReporte(
+                                    reporteId,
+                                    'revisado'
+                                  )
+                                }
+                                deshabilitado={
+                                  reporteId ==
+                                    null ||
+                                  reporteProcesandoId !==
+                                    null
+                                }
+                              />
+
+                              <LoadingButton
+                                cargando={
+                                  procesandoReporte
+                                }
+                                texto="Descartar reporte"
+                                textoCargando="Guardando..."
+                                variante="peligro"
+                                onClick={() =>
+                                  revisarReporte(
+                                    reporteId,
+                                    'descartado'
+                                  )
+                                }
+                                deshabilitado={
+                                  reporteId ==
+                                    null ||
+                                  reporteProcesandoId !==
+                                    null
+                                }
+                              />
+
+                            </div>
+
+                          </div>
+
+                        )}
+
+                      </article>
+
+                    )
+                  }
+                )}
 
               </div>
 
@@ -1479,6 +2641,7 @@ function Admin() {
                             )
 
                           return (
+
                             <motion.tr
                               key={punto.id}
                               variants={
@@ -1496,7 +2659,11 @@ function Admin() {
                                 </div>
 
                                 <div className="mt-1.5">
-                                  <CategoriasBadges categorias={punto.categorias} />
+                                  <CategoriasBadges
+                                    categorias={
+                                      punto.categorias
+                                    }
+                                  />
                                 </div>
 
                               </td>
@@ -1505,7 +2672,9 @@ function Admin() {
 
                                 <p
                                   className="text-xs text-gray-500 dark:text-[#a8b3ae] max-w-xs"
-                                  title={punto.descripcion}
+                                  title={
+                                    punto.descripcion
+                                  }
                                 >
                                   {punto.descripcion}
                                 </p>
@@ -1611,6 +2780,7 @@ function Admin() {
                               </td>
 
                             </motion.tr>
+
                           )
                         }
                       )}
@@ -1686,11 +2856,19 @@ function Admin() {
                 <div className="flex justify-between mt-4 text-xs font-semibold text-gray-500 dark:text-[#a8b3ae]">
 
                   <span>
-                    🟢 Aprobados: <strong>{puntosAprobados.length}</strong> ({porcentajeAprobados}%)
+                    🟢 Aprobados:{' '}
+                    <strong>
+                      {puntosAprobados.length}
+                    </strong>{' '}
+                    ({porcentajeAprobados}%)
                   </span>
 
                   <span>
-                    🟡 Pendientes: <strong>{puntosPendientes.length}</strong> ({porcentajePendientes}%)
+                    🟡 Pendientes:{' '}
+                    <strong>
+                      {puntosPendientes.length}
+                    </strong>{' '}
+                    ({porcentajePendientes}%)
                   </span>
 
                 </div>
@@ -1716,3 +2894,4 @@ function Admin() {
 }
 
 export default Admin
+

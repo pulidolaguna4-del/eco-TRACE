@@ -202,6 +202,23 @@ function Mapa() {
 
 
   // =======================================================
+  // REPORTE
+  // =======================================================
+
+  const [puntoReporte, setPuntoReporte] = useState(null)
+
+  const [mostrarReporte, setMostrarReporte] = useState(false)
+
+  const [motivoReporte, setMotivoReporte] = useState('')
+
+  const [mensajeReporte, setMensajeReporte] = useState('')
+
+  const [errorReporte, setErrorReporte] = useState('')
+
+  const [guardandoReporte, setGuardandoReporte] = useState(false)
+
+
+  // =======================================================
   // FORMULARIO PUNTO
   // =======================================================
 
@@ -709,6 +726,105 @@ function Mapa() {
 
     setMensajeEntrega('')
     setErrorEntrega('')
+  }
+
+
+  // =======================================================
+  // ABRIR FORMULARIO DE REPORTE
+  // =======================================================
+
+  const abrirFormularioReporte = (punto) => {
+    const token = localStorage.getItem('access_token')
+
+    if (!token) {
+      navigate('/login')
+      return
+    }
+
+    setPuntoReporte(punto)
+    setMostrarReporte(true)
+    setMotivoReporte('')
+    setMensajeReporte('')
+    setErrorReporte('')
+  }
+
+
+  // =======================================================
+  // CERRAR REPORTE
+  // =======================================================
+
+  const cerrarFormularioReporte = () => {
+    setMostrarReporte(false)
+    setPuntoReporte(null)
+    setMotivoReporte('')
+    setMensajeReporte('')
+    setErrorReporte('')
+  }
+
+
+  // =======================================================
+  // REGISTRAR REPORTE
+  // =======================================================
+
+  const registrarReporte = async (e) => {
+    e.preventDefault()
+
+    setErrorReporte('')
+    setMensajeReporte('')
+
+    const token = localStorage.getItem('access_token')
+
+    if (!token) {
+      navigate('/login')
+      return
+    }
+
+    if (!puntoReporte) {
+      setErrorReporte('No se seleccionó ningún punto')
+      return
+    }
+
+    const motivo = motivoReporte.trim()
+
+    if (motivo.length < 5) {
+      setErrorReporte('Explica el motivo con al menos 5 caracteres')
+      return
+    }
+
+    try {
+      setGuardandoReporte(true)
+
+      const respuesta = await fetch('http://127.0.0.1:8000/reportes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          punto_id: puntoReporte.id,
+          motivo
+        })
+      })
+
+      const datos = await respuesta.json()
+
+      if (!respuesta.ok) {
+        setErrorReporte(
+          datos.detail || 'No se pudo registrar el reporte'
+        )
+        return
+      }
+
+      setMensajeReporte(
+        '¡Reporte enviado correctamente! Será revisado por un administrador.'
+      )
+      setMotivoReporte('')
+    } catch (err) {
+      console.error(err)
+      setErrorReporte('No se pudo conectar con el servidor')
+    } finally {
+      setGuardandoReporte(false)
+    }
   }
 
 
@@ -1250,6 +1366,79 @@ function Mapa() {
                         ? '🚗 Calculando ruta...'
                         : '🚗 Cómo llegar'}
                     </button>
+
+                    {/* REPORTE */}
+                    <button
+                      type="button"
+                      onClick={() => abrirFormularioReporte(punto)}
+                      className="w-full mt-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                    >
+                      🚩 Reportar punto
+                    </button>
+
+                    {/* FORMULARIO REPORTE */}
+                    {mostrarReporte && puntoReporte?.id === punto.id && (
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <h4 className="font-extrabold text-sm text-gray-900 mb-2">
+                          🚩 Reportar punto ecológico
+                        </h4>
+
+                        <p className="text-[11px] text-gray-500 mb-3">
+                          Indica qué problema encontraste en {punto.nombre}.
+                        </p>
+
+                        <form onSubmit={registrarReporte} className="space-y-3">
+                          <textarea
+                            value={motivoReporte}
+                            onChange={(e) => {
+                              setMotivoReporte(e.target.value)
+                              setErrorReporte('')
+                              setMensajeReporte('')
+                            }}
+                            minLength={5}
+                            maxLength={500}
+                            required
+                            rows={3}
+                            placeholder="Ej.: el establecimiento está cerrado o ya no recibe materiales..."
+                            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs resize-y"
+                          />
+
+                          <p className="text-[10px] text-gray-500">
+                            {motivoReporte.length}/500 caracteres
+                          </p>
+
+                          {errorReporte && (
+                            <div className="p-2.5 bg-red-50 text-red-600 rounded-lg text-[11px] font-bold">
+                              ⚠️ {errorReporte}
+                            </div>
+                          )}
+
+                          {mensajeReporte && (
+                            <div className="p-2.5 bg-green-50 text-green-700 rounded-lg text-[11px] font-bold">
+                              ✅ {mensajeReporte}
+                            </div>
+                          )}
+
+                          <div className="flex gap-2">
+                            <button
+                              type="submit"
+                              disabled={guardandoReporte}
+                              className="flex-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold disabled:opacity-60"
+                            >
+                              {guardandoReporte ? 'Enviando...' : 'Enviar reporte'}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={cerrarFormularioReporte}
+                              className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-bold"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    )}
 
                     {/* ENTREGA */}
                     <button

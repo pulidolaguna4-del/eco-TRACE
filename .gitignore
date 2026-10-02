@@ -1,4 +1,7 @@
+
 # Node / React
+front/node_modules/
+front/dist/
 frontend/node_modules/
 frontend/dist/
 
@@ -8,10 +11,13 @@ backend/.venv/
 **/*.pyc
 **/*.pyo
 
-# Variables de entorno
+# Variables de entorno privadas
 .env
-frontend/.env
+.env.*
+!.env.example
+front/.env
 backend/.env
+frontend/.env
 
 # Editor / OS
 .vscode/

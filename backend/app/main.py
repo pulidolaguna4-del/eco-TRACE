@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlmodel import SQLModel, Session, select
 from pwdlib import PasswordHash
+from pydantic import BaseModel, Field
 
 import jwt
 import os
@@ -35,7 +36,10 @@ from app.models import (
     CodigoRecuperacion,
     SolicitarRecuperacion,
     VerificarCodigo,
-    NuevaContrasena
+    NuevaContrasena,
+    Reporte,
+    ReporteRegistro,
+    ReporteRevision
 )
 
 
@@ -80,20 +84,22 @@ app = FastAPI(
     title="Eco-TRACE API"
 )
 
+# =========================================================
+# ESQUEMA PARA CAMBIAR CONTRASEÑA DESDE EL PERFIL
+# =========================================================
+
+class CambiarContrasenaPerfil(BaseModel):
+    password_actual: str
+    nueva_password: str = Field(min_length=8)
 
 # =========================================================
-# CORS - PERMITIR FRONTEND REACT
+# CORS - PERMITIR FRONTEND (LOCAL Y TÚNEL)
 # =========================================================
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost",
-        "http://127.0.0.1"
-    ],
-    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:[0-9]+)?",
+    allow_origins=[],
+    allow_origin_regex=r"(http://(localhost|127\.0\.0\.1)(:[0-9]+)?|https://.*\.devtunnels\.ms)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -845,6 +851,70 @@ def actualizar_mi_perfil(
 
 
 # =========================================================
+# CAMBIAR CONTRASEÑA DESDE EL PERFIL
+# =========================================================
+
+@app.put("/usuarios/me/contrasena")
+def cambiar_contrasena_desde_perfil(
+    datos: CambiarContrasenaPerfil,
+    usuario_actual: Usuario = Depends(obtener_usuario_actual)
+):
+    # Validar la nueva contraseña
+    if len(datos.nueva_password.strip()) < 8:
+        raise HTTPException(
+            status_code=400,
+            detail="La nueva contraseña debe tener al menos 8 caracteres"
+        )
+
+    # No permitir que la nueva contraseña esté vacía
+    if not datos.nueva_password.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="La nueva contraseña no puede estar vacía"
+        )
+
+    # No permitir conservar la misma contraseña
+    if datos.password_actual == datos.nueva_password:
+        raise HTTPException(
+            status_code=400,
+            detail="La nueva contraseña debe ser diferente a la actual"
+        )
+
+    with Session(engine) as session:
+        usuario = session.get(Usuario, usuario_actual.id)
+
+        if not usuario:
+            raise HTTPException(
+                status_code=404,
+                detail="Usuario no encontrado"
+            )
+
+        # Comprobar la contraseña actual con el hash almacenado
+        contraseña_correcta = password_hash.verify(
+            datos.password_actual,
+            usuario.password
+        )
+
+        if not contraseña_correcta:
+            raise HTTPException(
+                status_code=400,
+                detail="La contraseña actual es incorrecta"
+            )
+
+        # Guardar la nueva contraseña utilizando el hash existente
+        usuario.password = password_hash.hash(datos.nueva_password)
+
+        session.add(usuario)
+        session.commit()
+
+    return {
+        "mensaje": "Contraseña actualizada correctamente"
+    }
+
+
+
+
+# =========================================================
 # ADMIN - LISTAR USUARIOS
 # =========================================================
 
@@ -915,109 +985,197 @@ def cambiar_estado_admin(
         return usuario
 
 
+
+
 # =========================================================
-# ADMIN - ELIMINAR USUARIO
+# ADMIN - ELIMINAR USUARIO Y SUS DATOS RELACIONADOS
 # =========================================================
 
-@app.delete(
-    "/admin/usuarios/{usuario_id}"
-)
+@app.delete("/admin/usuarios/{usuario_id}")
 def eliminar_usuario_admin(
     usuario_id: int,
-    administrador: Usuario = Depends(
-        obtener_admin_actual
-    )
+    administrador: Usuario = Depends(obtener_admin_actual)
 ):
-
     with Session(engine) as session:
+        try:
+            # 1. Buscar usuario
+            usuario = session.get(Usuario, usuario_id)
 
-        usuario = session.get(
-            Usuario,
-            usuario_id
-        )
+            if not usuario:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Usuario no encontrado"
+                )
 
-        if not usuario:
+            # 2. Evitar que el administrador se elimine a sí mismo
+            if usuario.id == administrador.id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No puedes eliminar tu propia cuenta desde el panel de administración"
+                )
 
-            raise HTTPException(
-                status_code=404,
-                detail="Usuario no encontrado"
-            )
-
-        # No permitir eliminarse a sí mismo
-        if usuario.id == administrador.id:
-
-            raise HTTPException(
-                status_code=400,
-                detail="No puedes eliminar tu propia cuenta desde el panel de administración"
-            )
-
-        # -------------------------------------------------
-        # Eliminar entregas relacionadas con los puntos
-        # del usuario
-        # -------------------------------------------------
-
-        puntos_usuario = session.exec(
-            select(Punto).where(
-                Punto.usuario_id == usuario.id
-            )
-        ).all()
-
-        for punto in puntos_usuario:
-
-            entregas_punto = session.exec(
-                select(Entrega).where(
-                    Entrega.punto_id == punto.id
+            # 3. Obtener los puntos creados por el usuario
+            puntos_usuario = session.exec(
+                select(Punto).where(
+                    Punto.usuario_id == usuario.id
                 )
             ).all()
 
-            for entrega in entregas_punto:
+            puntos_ids = [
+                punto.id
+                for punto in puntos_usuario
+                if punto.id is not None
+            ]
+
+            # 4. Eliminar reportes creados por el usuario
+            # o asociados a sus puntos
+            if puntos_ids:
+                reportes = session.exec(
+                    select(Reporte).where(
+                        (Reporte.usuario_id == usuario.id)
+                        | (Reporte.punto_id.in_(puntos_ids))
+                    )
+                ).all()
+            else:
+                reportes = session.exec(
+                    select(Reporte).where(
+                        Reporte.usuario_id == usuario.id
+                    )
+                ).all()
+
+            for reporte in reportes:
+                session.delete(reporte)
+
+            # 5. Eliminar entregas realizadas por el usuario
+            # o asociadas a sus puntos
+            if puntos_ids:
+                entregas = session.exec(
+                    select(Entrega).where(
+                        (Entrega.usuario_id == usuario.id)
+                        | (Entrega.punto_id.in_(puntos_ids))
+                    )
+                ).all()
+            else:
+                entregas = session.exec(
+                    select(Entrega).where(
+                        Entrega.usuario_id == usuario.id
+                    )
+                ).all()
+
+            for entrega in entregas:
                 session.delete(entrega)
 
-        # -------------------------------------------------
-        # Eliminar entregas realizadas por el usuario
-        # -------------------------------------------------
+            # 6. Eliminar relaciones entre puntos y categorías
+            if puntos_ids:
+                relaciones = session.exec(
+                    select(PuntoCategoria).where(
+                        PuntoCategoria.punto_id.in_(puntos_ids)
+                    )
+                ).all()
 
-        entregas_usuario = session.exec(
-            select(Entrega).where(
-                Entrega.usuario_id == usuario.id
+                for relacion in relaciones:
+                    session.delete(relacion)
+
+            # 7. Eliminar puntos del usuario
+            for punto in puntos_usuario:
+                session.delete(punto)
+
+            # 8. Eliminar códigos de recuperación
+            codigos = session.exec(
+                select(CodigoRecuperacion).where(
+                    CodigoRecuperacion.usuario_id == usuario.id
+                )
+            ).all()
+
+            for codigo in codigos:
+                session.delete(codigo)
+
+            # 9. Eliminar usuario
+            session.delete(usuario)
+
+            # 10. Confirmar cambios
+            session.commit()
+
+            return {
+                "mensaje": "Usuario y sus datos relacionados eliminados correctamente"
+            }
+
+        except HTTPException:
+            session.rollback()
+            raise
+
+        except Exception as error:
+            session.rollback()
+
+            print(
+                "ERROR AL ELIMINAR USUARIO:",
+                error
+            )
+
+            raise HTTPException(
+                status_code=500,
+                detail="No se pudo eliminar el usuario y sus datos relacionados"
+            )
+
+# =========================================================
+# ADMIN - ELIMINAR PUNTO
+# =========================================================
+
+@app.delete("/admin/puntos/{punto_id}")
+def eliminar_punto_admin(
+    punto_id: int,
+    administrador: Usuario = Depends(obtener_admin_actual)
+):
+    with Session(engine) as session:
+
+        # 1. Buscar el punto
+        punto = session.get(Punto, punto_id)
+
+        if not punto:
+            raise HTTPException(
+                status_code=404,
+                detail="Punto no encontrado"
+            )
+
+        # 2. Eliminar reportes asociados al punto
+        reportes = session.exec(
+            select(Reporte).where(
+                Reporte.punto_id == punto.id
             )
         ).all()
 
-        for entrega in entregas_usuario:
+        for reporte in reportes:
+            session.delete(reporte)
+
+        # 3. Eliminar entregas asociadas al punto
+        entregas = session.exec(
+            select(Entrega).where(
+                Entrega.punto_id == punto.id
+            )
+        ).all()
+
+        for entrega in entregas:
             session.delete(entrega)
 
-        # -------------------------------------------------
-        # Eliminar puntos creados por el usuario
-        # -------------------------------------------------
-
-        for punto in puntos_usuario:
-            session.delete(punto)
-
-        # -------------------------------------------------
-        # Eliminar codigos de recuperacion del usuario
-        # -------------------------------------------------
-
-        codigos_usuario = session.exec(
-            select(CodigoRecuperacion).where(
-                CodigoRecuperacion.usuario_id == usuario.id
+        # 4. Eliminar relaciones con categorías
+        relaciones = session.exec(
+            select(PuntoCategoria).where(
+                PuntoCategoria.punto_id == punto.id
             )
         ).all()
 
-        for codigo in codigos_usuario:
-            session.delete(codigo)
+        for relacion in relaciones:
+            session.delete(relacion)
 
-        # -------------------------------------------------
-        # Eliminar usuario
-        # -------------------------------------------------
+        # 5. Eliminar el punto
+        session.delete(punto)
 
-        session.delete(usuario)
-
+        # 6. Confirmar cambios
         session.commit()
 
         return {
-            "mensaje": "Usuario eliminado correctamente"
+            "mensaje": "Punto eliminado correctamente"
         }
-
 
 # =========================================================
 # REGISTRAR PUNTO ECOLÓGICO
@@ -1048,9 +1206,13 @@ def registrar_punto(
             )
         ).all()
 
-        cat_map = {c.nombre: c for c in categorias_db}
+        cat_map = {
+            c.nombre: c
+            for c in categorias_db
+        }
 
         for cat_nombre in datos.categorias:
+
             if cat_nombre not in cat_map:
                 raise HTTPException(
                     status_code=400,
@@ -1069,14 +1231,18 @@ def registrar_punto(
             usuario_id=usuario_actual.id
         )
 
-        nuevo_punto.categorias = [cat_map[c] for c in datos.categorias]
+        nuevo_punto.categorias = [
+            cat_map[c]
+            for c in datos.categorias
+        ]
 
         session.add(nuevo_punto)
         session.commit()
         session.refresh(nuevo_punto)
 
-        return construir_punto_respuesta(nuevo_punto)
-
+        return construir_punto_respuesta(
+            nuevo_punto
+        )
 
 # =========================================================
 # LISTAR PUNTOS APROBADOS
@@ -1148,6 +1314,30 @@ def listar_puntos_pendientes(
 
         return [construir_punto_respuesta(p) for p in puntos]
 
+# =========================================================
+# ADMIN - LISTAR TODOS LOS PUNTOS
+# =========================================================
+
+@app.get(
+    "/admin/puntos",
+    response_model=list[PuntoRespuesta]
+)
+def listar_todos_los_puntos(
+    administrador: Usuario = Depends(
+        obtener_admin_actual
+    )
+):
+
+    with Session(engine) as session:
+
+        puntos = session.exec(
+            select(Punto)
+        ).all()
+
+        return [
+            construir_punto_respuesta(p)
+            for p in puntos
+        ]
 
 # =========================================================
 # ADMIN - APROBAR PUNTO
@@ -1357,3 +1547,156 @@ def listar_mis_entregas(
         ).all()
 
         return entregas
+
+# =========================================================
+# REPORTES - REGISTRAR REPORTE DE UN PUNTO
+# =========================================================
+
+@app.post("/reportes")
+def registrar_reporte(
+    datos: ReporteRegistro,
+    usuario_actual: Usuario = Depends(obtener_usuario_actual)
+):
+    motivo = datos.motivo.strip()
+
+    if len(motivo) < 5:
+        raise HTTPException(
+            status_code=400,
+            detail="Explica el motivo del reporte con al menos 5 caracteres"
+        )
+
+    with Session(engine) as session:
+        punto = session.get(Punto, datos.punto_id)
+
+        if not punto or punto.estado != "aprobado":
+            raise HTTPException(
+                status_code=404,
+                detail="No se encontró un punto ecológico disponible para reportar"
+            )
+
+        # Evitar reportes pendientes duplicados del mismo usuario
+        # sobre el mismo punto.
+        reporte_existente = session.exec(
+            select(Reporte).where(
+                Reporte.punto_id == datos.punto_id,
+                Reporte.usuario_id == usuario_actual.id,
+                Reporte.estado == "pendiente"
+            )
+        ).first()
+
+        if reporte_existente:
+            raise HTTPException(
+                status_code=409,
+                detail="Ya tienes un reporte pendiente para este punto"
+            )
+
+        nuevo_reporte = Reporte(
+            punto_id=datos.punto_id,
+            usuario_id=usuario_actual.id,
+            motivo=motivo,
+            estado="pendiente"
+        )
+
+        session.add(nuevo_reporte)
+        session.commit()
+        session.refresh(nuevo_reporte)
+
+        return {
+            "mensaje": "Reporte registrado correctamente",
+            "reporte": {
+                "id": nuevo_reporte.id,
+                "punto_id": nuevo_reporte.punto_id,
+                "estado": nuevo_reporte.estado,
+                "fecha_creacion": nuevo_reporte.fecha_creacion
+            }
+        }
+
+
+# =========================================================
+# ADMIN - LISTAR REPORTES
+# =========================================================
+
+@app.get("/admin/reportes")
+def listar_reportes_admin(
+    administrador: Usuario = Depends(obtener_admin_actual)
+):
+    with Session(engine) as session:
+        reportes = session.exec(
+            select(Reporte).order_by(
+                Reporte.fecha_creacion.desc()
+            )
+        ).all()
+
+        resultado = []
+
+        for reporte in reportes:
+            punto = session.get(Punto, reporte.punto_id)
+            usuario = session.get(Usuario, reporte.usuario_id)
+
+            resultado.append({
+                "id": reporte.id,
+                "punto_id": reporte.punto_id,
+                "nombre_punto": punto.nombre if punto else "Punto eliminado",
+                "direccion_punto": punto.direccion if punto else None,
+                "usuario_id": reporte.usuario_id,
+                "nombre_usuario": usuario.nombre if usuario else "Usuario eliminado",
+                "correo_usuario": usuario.correo if usuario else None,
+                "motivo": reporte.motivo,
+                "estado": reporte.estado,
+                "fecha_creacion": reporte.fecha_creacion,
+                "observacion_admin": reporte.observacion_admin
+            })
+
+        return resultado
+
+
+# =========================================================
+# ADMIN - REVISAR UN REPORTE
+# =========================================================
+
+@app.put("/admin/reportes/{reporte_id}/revisar")
+def revisar_reporte_admin(
+    reporte_id: int,
+    datos: ReporteRevision,
+    administrador: Usuario = Depends(obtener_admin_actual)
+):
+    estados_permitidos = {"revisado", "descartado"}
+
+    if datos.estado not in estados_permitidos:
+        raise HTTPException(
+            status_code=400,
+            detail="El estado debe ser 'revisado' o 'descartado'"
+        )
+
+    with Session(engine) as session:
+        reporte = session.get(Reporte, reporte_id)
+
+        if not reporte:
+            raise HTTPException(
+                status_code=404,
+                detail="Reporte no encontrado"
+            )
+
+        if reporte.estado != "pendiente":
+            raise HTTPException(
+                status_code=409,
+                detail="Este reporte ya fue gestionado"
+            )
+
+        reporte.estado = datos.estado
+        reporte.observacion_admin = (
+            datos.observacion_admin.strip()
+            if datos.observacion_admin
+            else None
+        )
+
+        session.add(reporte)
+        session.commit()
+        session.refresh(reporte)
+
+        return {
+            "mensaje": "Reporte actualizado correctamente",
+            "id": reporte.id,
+            "estado": reporte.estado,
+            "observacion_admin": reporte.observacion_admin
+        }
