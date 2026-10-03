@@ -250,6 +250,7 @@ function Admin() {
 
   // Reportes enviados por la comunidad sobre puntos ecológicos.
   const [reportes, setReportes] = useState([])
+  const [entregas, setEntregas] = useState([])
   const [observacionesReportes, setObservacionesReportes] = useState({})
   const [reporteProcesandoId, setReporteProcesandoId] = useState(null)
 
@@ -542,6 +543,59 @@ function Admin() {
         setError((mensajeActual) =>
           mensajeActual ||
           `${errorReportes.message}. Verifica que la ruta /admin/reportes esté implementada en el backend.`
+        )
+      }
+  
+      // -----------------------------------------------------
+      // ENTREGAS REGISTRADAS
+      // -----------------------------------------------------
+
+      try {
+        const resEntregas = await fetch(
+          `${API_URL}/admin/entregas`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        )
+
+        if (!resEntregas.ok) {
+          let detalle = null
+
+          try {
+            detalle = await resEntregas.json()
+          } catch {
+            detalle = null
+          }
+
+          throw new Error(
+            detalle?.detail ||
+            'No se pudieron cargar las entregas'
+          )
+        }
+
+        const datosEntregas =
+          await resEntregas.json()
+
+        setEntregas(
+          Array.isArray(datosEntregas)
+            ? datosEntregas
+            : []
+        )
+
+      } catch (errorEntregas) {
+
+        console.error(
+          'Error cargando entregas:',
+          errorEntregas
+        )
+
+        setEntregas([])
+
+        setError((mensajeActual) =>
+          mensajeActual ||
+          `${errorEntregas.message}. Verifica que la ruta /admin/entregas esté implementada en el backend.`
         )
       }
 
@@ -1442,6 +1496,34 @@ function Admin() {
                   </span>
                 )}
               </button>
+    
+              {/* ENTREGAS */}
+
+              <button
+                type="button"
+                onClick={() =>
+                  setPestañaActiva(
+                    'entregas'
+                  )
+                }
+                className={`px-3.5 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center gap-1.5 ${
+                  pestañaActiva ===
+                  'entregas'
+                    ? 'bg-white dark:bg-[#1a2320] text-[#218739] dark:text-[#2fa350] shadow-2xs'
+                    : 'text-gray-500 dark:text-[#a8b3ae]'
+                }`}
+              >
+                ♻️ Entregas
+
+                {entregas.length >
+                  0 && (
+                  <span className="bg-[#218739] text-white text-[10px] px-1.5 py-0.2 rounded-full font-black">
+                    {entregas.length}
+                  </span>
+                )}
+              </button>
+
+              
 
               {/* USUARIOS */}
 
@@ -1694,559 +1776,841 @@ function Admin() {
 
         </section>
 
-        {/* =====================================================
-            PESTAÑA PUNTOS
-        ===================================================== */}
+       {/* =====================================================
+    PESTAÑA PUNTOS
+===================================================== */}
 
-        {pestañaActiva === 'puntos' ? (
+{pestañaActiva === 'puntos' ? (
 
-          <section className="bg-white dark:bg-[#1a2320] rounded-3xl border border-gray-100 dark:border-gray-800/40 shadow-xs overflow-hidden">
+  <section className="bg-white dark:bg-[#1a2320] rounded-3xl border border-gray-100 dark:border-gray-800/40 shadow-xs overflow-hidden">
 
-            <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-800/40 bg-gray-50/30 dark:bg-[#121816]/30">
+    <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-800/40 bg-gray-50/30 dark:bg-[#121816]/30">
 
-              <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
 
-                <div>
+        <div>
 
-                  <h3 className="text-base font-extrabold text-gray-800 dark:text-[#f2f5f3]">
-                    Todos los puntos ecológicos
-                  </h3>
+          <h3 className="text-base font-extrabold text-gray-800 dark:text-[#f2f5f3]">
+            Todos los puntos ecológicos
+          </h3>
 
-                  <p className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-1">
-                    Consulta y administra todos los puntos registrados en Eco-TRACE.
-                  </p>
+          <p className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-1">
+            Consulta y administra todos los puntos registrados en Eco-TRACE.
+          </p>
 
-                </div>
+        </div>
 
-                <Badge
-                  tipo="info"
-                  texto={`${todosLosPuntos.length} puntos`}
-                />
+        <Badge
+          tipo="info"
+          texto={`${todosLosPuntos.length} puntos`}
+        />
 
-              </div>
+      </div>
 
-            </div>
+    </div>
 
-            {cargando ? (
+    {cargando ? (
 
-              <div className="p-8 text-center text-sm text-gray-400">
-                ⏳ Cargando puntos...
-              </div>
+      <div className="p-8 text-center text-sm text-gray-400">
+        ⏳ Cargando puntos...
+      </div>
 
-            ) : todosLosPuntos.length === 0 ? (
+    ) : todosLosPuntos.length === 0 ? (
 
-              <EmptyState
-                titulo="No hay puntos registrados"
-                descripcion="Actualmente no existen puntos ecológicos registrados en el sistema."
-                icono="📍"
-              />
+      <EmptyState
+        titulo="No hay puntos registrados"
+        descripcion="Actualmente no existen puntos ecológicos registrados en el sistema."
+        icono="📍"
+      />
 
-            ) : (
+    ) : (
 
-              <div className="overflow-x-auto">
+      <div className="overflow-x-auto">
 
-                <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800/40">
+        <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800/40">
 
-                  <thead>
+          <thead>
 
-                    <tr className="bg-gray-50/30 dark:bg-[#121816]/30 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">
+            <tr className="bg-gray-50/30 dark:bg-[#121816]/30 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">
 
-                      <th className="px-6 py-4">
-                        Punto
-                      </th>
+              <th className="px-6 py-4">
+                Punto
+              </th>
 
-                      <th className="px-6 py-4">
-                        Ubicación
-                      </th>
+              <th className="px-6 py-4">
+                Ubicación
+              </th>
 
-                      <th className="px-6 py-4">
-                        Categorías
-                      </th>
+              <th className="px-6 py-4">
+                Categorías
+              </th>
 
-                      <th className="px-6 py-4">
-                        Estado
-                      </th>
+              <th className="px-6 py-4">
+                Estado
+              </th>
 
-                      <th className="px-6 py-4">
-                        Creador
-                      </th>
+              <th className="px-6 py-4">
+                Creador
+              </th>
 
-                      <th className="px-6 py-4 text-right">
-                        Acciones
-                      </th>
+              <th className="px-6 py-4 text-right">
+                Acciones
+              </th>
 
-                    </tr>
+            </tr>
 
-                  </thead>
+          </thead>
 
-                  <motion.tbody
-                    variants={contenedorVariantes}
-                    initial="oculto"
-                    animate="visible"
-                    className="divide-y divide-gray-100 dark:divide-gray-800/40"
-                  >
+          <motion.tbody
+            variants={contenedorVariantes}
+            initial="oculto"
+            animate="visible"
+            className="divide-y divide-gray-100 dark:divide-gray-800/40"
+          >
 
-                    <AnimatePresence>
+            <AnimatePresence>
 
-                      {todosLosPuntos.map(
-                        (punto) => {
+              {todosLosPuntos.map(
+                (punto) => {
 
-                          const creador =
-                            obtenerCreador(
-                              punto.usuario_id
+                  const creador =
+                    obtenerCreador(
+                      punto.usuario_id
+                    )
+
+                  const eliminando =
+                    puntoEliminandoId ===
+                    punto.id
+
+                  return (
+
+                    <motion.tr
+                      key={punto.id}
+                      variants={elementoVariantes}
+                      initial="oculto"
+                      animate="visible"
+                      exit="salida"
+                      className="hover:bg-gray-50/30 dark:hover:bg-gray-800/20"
+                    >
+
+                      {/* PUNTO */}
+
+                      <td className="px-6 py-4">
+
+                        <div className="flex items-start gap-3">
+
+                          <div className="w-9 h-9 rounded-xl bg-[#f1f8f4] dark:bg-[#0f1512] flex items-center justify-center text-[#218739] dark:text-[#2fa350] font-black shrink-0">
+                            📍
+                          </div>
+
+                          <div className="min-w-0">
+
+                            <div className="text-sm font-extrabold text-gray-800 dark:text-[#f2f5f3]">
+                              {punto.nombre}
+                            </div>
+
+                            <div className="text-[10px] text-gray-400 font-mono mt-1">
+                              ID: {punto.id}
+                            </div>
+
+                            <p
+                              className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-2 max-w-xs"
+                              title={punto.descripcion}
+                            >
+                              {punto.descripcion}
+                            </p>
+
+                          </div>
+
+                        </div>
+
+                      </td>
+
+                      {/* UBICACIÓN */}
+
+                      <td className="px-6 py-4">
+
+                        <div className="text-xs text-gray-800 dark:text-[#f2f5f3] font-bold">
+                          {punto.direccion}
+                        </div>
+
+                        <div className="text-[11px] text-gray-400 mt-0.5">
+                          {punto.localidad}
+                        </div>
+
+                        <div className="text-[10px] text-gray-400 font-mono mt-1">
+                          {Number(
+                            punto.latitud
+                          ).toFixed(5)}
+                          {', '}
+                          {Number(
+                            punto.longitud
+                          ).toFixed(5)}
+                        </div>
+
+                      </td>
+
+                      {/* CATEGORÍAS */}
+
+                      <td className="px-6 py-4">
+
+                        <div className="flex flex-wrap gap-1.5 max-w-xs">
+
+                          {punto.categorias?.map(
+                            (
+                              categoria,
+                              index
+                            ) => (
+                              <span
+                                key={`${punto.id}-${index}`}
+                                className="text-[10px] font-bold px-2 py-1 rounded-full bg-gray-100 dark:bg-[#121816] text-gray-600 dark:text-[#b9c5c0]"
+                              >
+                                {categoria}
+                              </span>
                             )
+                          )}
 
-                          const eliminando =
-                            puntoEliminandoId ===
-                            punto.id
+                        </div>
 
-                          return (
+                      </td>
 
-                            <motion.tr
-                              key={punto.id}
-                              variants={
-                                elementoVariantes
-                              }
-                              initial="oculto"
-                              animate="visible"
-                              exit="salida"
-                              className="hover:bg-gray-50/30 dark:hover:bg-gray-800/20"
-                            >
-
-                              {/* PUNTO */}
+                      {/* ESTADO */}
 
-                              <td className="px-6 py-4">
-
-                                <div className="flex items-start gap-3">
-
-                                  <div className="w-9 h-9 rounded-xl bg-[#f1f8f4] dark:bg-[#0f1512] flex items-center justify-center text-[#218739] dark:text-[#2fa350] font-black shrink-0">
-                                    📍
-                                  </div>
+                      <td className="px-6 py-4 whitespace-nowrap">
 
-                                  <div className="min-w-0">
+                        <Badge
+                          tipo={
+                            punto.estado ===
+                            'aprobado'
+                              ? 'aprobado'
+                              : punto.estado ===
+                                'rechazado'
+                                ? 'rechazado'
+                                : 'pendiente'
+                          }
+                          texto={
+                            punto.estado
+                          }
+                        />
 
-                                    <div className="text-sm font-extrabold text-gray-800 dark:text-[#f2f5f3]">
-                                      {punto.nombre}
-                                    </div>
+                        {punto.motivo_rechazo && (
+                          <p className="text-[10px] text-red-500 mt-2 max-w-xs">
+                            Motivo: {punto.motivo_rechazo}
+                          </p>
+                        )}
 
-                                    <div className="text-[10px] text-gray-400 font-mono mt-1">
-                                      ID: {punto.id}
-                                    </div>
+                      </td>
 
-                                    <p
-                                      className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-2 max-w-xs"
-                                      title={punto.descripcion}
-                                    >
-                                      {punto.descripcion}
-                                    </p>
+                      {/* CREADOR */}
 
-                                  </div>
+                      <td className="px-6 py-4 whitespace-nowrap">
 
-                                </div>
+                        {creador ? (
 
-                              </td>
+                          <div>
 
-                              {/* UBICACIÓN */}
+                            <div className="text-xs font-bold text-gray-800 dark:text-[#f2f5f3]">
+                              {creador.nombre}
+                            </div>
 
-                              <td className="px-6 py-4">
+                            <div className="text-[11px] text-gray-400 mt-0.5">
+                              {creador.correo}
+                            </div>
 
-                                <div className="text-xs text-gray-800 dark:text-[#f2f5f3] font-bold">
-                                  {punto.direccion}
-                                </div>
+                            <div className="text-[10px] text-gray-400 mt-0.5">
+                              ID: {creador.id}
+                            </div>
 
-                                <div className="text-[11px] text-gray-400 mt-0.5">
-                                  {punto.localidad}
-                                </div>
+                          </div>
 
-                                <div className="text-[10px] text-gray-400 font-mono mt-1">
-                                  {Number(
-                                    punto.latitud
-                                  ).toFixed(5)}
-                                  {', '}
-                                  {Number(
-                                    punto.longitud
-                                  ).toFixed(5)}
-                                </div>
+                        ) : (
 
-                              </td>
+                          <span className="text-xs text-gray-500">
+                            Usuario #{punto.usuario_id}
+                          </span>
 
-                              {/* CATEGORÍAS */}
+                        )}
 
-                              <td className="px-6 py-4">
+                      </td>
 
-                                <div className="flex flex-wrap gap-1.5 max-w-xs">
+                      {/* ACCIONES */}
 
-                                  {punto.categorias?.map(
-                                    (
-                                      categoria,
-                                      index
-                                    ) => (
-                                      <span
-                                        key={`${punto.id}-${index}`}
-                                        className="text-[10px] font-bold px-2 py-1 rounded-full bg-gray-100 dark:bg-[#121816] text-gray-600 dark:text-[#b9c5c0]"
-                                      >
-                                        {categoria}
-                                      </span>
-                                    )
-                                  )}
+                      <td className="px-6 py-4 whitespace-nowrap">
 
-                                </div>
+                        <div className="flex items-center justify-end">
 
-                              </td>
+                          <LoadingButton
+                            cargando={
+                              eliminando
+                            }
+                            texto="🗑️ Eliminar"
+                            textoCargando="Eliminando..."
+                            variante="peligro"
+                            onClick={() =>
+                              eliminarPunto(
+                                punto.id
+                              )
+                            }
+                            deshabilitado={
+                              puntoEliminandoId !==
+                                null &&
+                              !eliminando
+                            }
+                          />
 
-                              {/* ESTADO */}
+                        </div>
 
-                              <td className="px-6 py-4 whitespace-nowrap">
+                      </td>
 
-                                <Badge
-                                  tipo={
-                                    punto.estado ===
-                                    'aprobado'
-                                      ? 'aprobado'
-                                      : punto.estado ===
-                                        'rechazado'
-                                        ? 'rechazado'
-                                        : 'pendiente'
-                                  }
-                                  texto={
-                                    punto.estado
-                                  }
-                                />
+                    </motion.tr>
 
-                                {punto.motivo_rechazo && (
-                                  <p className="text-[10px] text-red-500 mt-2 max-w-xs">
-                                    Motivo: {punto.motivo_rechazo}
-                                  </p>
-                                )}
+                  )
+                }
+              )}
 
-                              </td>
+            </AnimatePresence>
 
-                              {/* CREADOR */}
+          </motion.tbody>
 
-                              <td className="px-6 py-4 whitespace-nowrap">
+        </table>
 
-                                {creador ? (
+      </div>
 
-                                  <div>
+    )}
 
-                                    <div className="text-xs font-bold text-gray-800 dark:text-[#f2f5f3]">
-                                      {creador.nombre}
-                                    </div>
+  </section>
 
-                                    <div className="text-[11px] text-gray-400 mt-0.5">
-                                      {creador.correo}
-                                    </div>
+) : pestañaActiva === 'entregas' ? (
 
-                                    <div className="text-[10px] text-gray-400 mt-0.5">
-                                      ID: {creador.id}
-                                    </div>
+  /* =====================================================
+     PESTAÑA ENTREGAS
+  ===================================================== */
 
-                                  </div>
+  <section className="bg-white dark:bg-[#1a2320] rounded-3xl border border-gray-100 dark:border-gray-800/40 shadow-xs overflow-hidden">
 
-                                ) : (
+    <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-800/40 bg-gray-50/30 dark:bg-[#121816]/30">
 
-                                  <span className="text-xs text-gray-500">
-                                    Usuario #{punto.usuario_id}
-                                  </span>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
 
-                                )}
+        <div>
 
-                              </td>
+          <h3 className="text-base font-extrabold text-gray-800 dark:text-[#f2f5f3]">
+            Entregas registradas
+          </h3>
 
-                              {/* ACCIONES */}
+          <p className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-1">
+            Consulta las entregas realizadas por los usuarios en los puntos ecológicos.
+          </p>
 
-                              <td className="px-6 py-4 whitespace-nowrap">
+        </div>
 
-                                <div className="flex items-center justify-end">
+        <Badge
+          tipo="info"
+          texto={`${entregas.length} entregas`}
+        />
 
-                                  <LoadingButton
-                                    cargando={
-                                      eliminando
-                                    }
-                                    texto="🗑️ Eliminar"
-                                    textoCargando="Eliminando..."
-                                    variante="peligro"
-                                    onClick={() =>
-                                      eliminarPunto(
-                                        punto.id
-                                      )
-                                    }
-                                    deshabilitado={
-                                      puntoEliminandoId !==
-                                        null &&
-                                      !eliminando
-                                    }
-                                  />
+      </div>
 
-                                </div>
+    </div>
 
-                              </td>
+    {cargando ? (
 
-                            </motion.tr>
+      <div className="p-8 text-center text-sm text-gray-400">
+        ⏳ Cargando entregas...
+      </div>
 
-                          )
-                        }
-                      )}
+    ) : entregas.length === 0 ? (
 
-                    </AnimatePresence>
+      <EmptyState
+        titulo="No hay entregas registradas"
+        descripcion="Actualmente no existen entregas registradas en el sistema."
+        icono="♻️"
+      />
 
-                  </motion.tbody>
+    ) : (
 
-                </table>
+      <div className="overflow-x-auto">
 
-              </div>
+        <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800/40">
 
-            )}
+          <thead>
 
-          </section>
+            <tr className="bg-gray-50/30 dark:bg-[#121816]/30 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">
 
-        ) : pestañaActiva ===
-        'usuarios' ? (
+              <th className="px-6 py-4">
+                Usuario
+              </th>
 
-          /* =====================================================
-             PESTAÑA USUARIOS
-          ===================================================== */
+              <th className="px-6 py-4">
+                Punto ecológico
+              </th>
 
-          <section className="bg-white dark:bg-[#1a2320] rounded-3xl border border-gray-100 dark:border-gray-800/40 shadow-xs overflow-hidden">
+              <th className="px-6 py-4">
+                Tipo
+              </th>
 
-            <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-800/40 bg-gray-50/30 dark:bg-[#121816]/30">
+              <th className="px-6 py-4">
+                Cantidad
+              </th>
 
-              <div className="flex items-center justify-between gap-4">
+              <th className="px-6 py-4">
+                Fecha
+              </th>
 
-                <div>
+              <th className="px-6 py-4">
+                Estado
+              </th>
 
-                  <h3 className="text-base font-extrabold text-gray-800 dark:text-[#f2f5f3]">
-                    Usuarios registrados
-                  </h3>
+              <th className="px-6 py-4">
+                Observación
+              </th>
 
-                  <p className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-1">
-                    Administra los usuarios registrados en Eco-TRACE.
-                  </p>
+            </tr>
 
-                </div>
+          </thead>
 
-                <Badge
-                  tipo="usuario"
-                  texto={`${usuarios.length} usuarios`}
-                />
+          <motion.tbody
+            variants={contenedorVariantes}
+            initial="oculto"
+            animate="visible"
+            className="divide-y divide-gray-100 dark:divide-gray-800/40"
+          >
 
-              </div>
+            <AnimatePresence>
 
-            </div>
+              {entregas.map(
+                (entrega) => (
 
-            {cargando ? (
-
-              <div className="p-8 text-center text-sm text-gray-400">
-                ⏳ Cargando usuarios...
-              </div>
-
-            ) : usuarios.length === 0 ? (
-
-              <EmptyState
-                titulo="No hay usuarios"
-                descripcion="No existen usuarios registrados en el sistema."
-                icono="👥"
-              />
-
-            ) : (
-
-              <div className="overflow-x-auto">
-
-                <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800/40">
-
-                  <thead>
-
-                    <tr className="bg-gray-50/30 dark:bg-[#121816]/30 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">
-
-                      <th className="px-6 py-4">
-                        ID
-                      </th>
-
-                      <th className="px-6 py-4">
-                        Usuario
-                      </th>
-
-                      <th className="px-6 py-4">
-                        Correo
-                      </th>
-
-                      <th className="px-6 py-4">
-                        Rol
-                      </th>
-
-                      <th className="px-6 py-4 text-right">
-                        Acciones
-                      </th>
-
-                    </tr>
-
-                  </thead>
-
-                  <motion.tbody
-                    variants={contenedorVariantes}
+                  <motion.tr
+                    key={entrega.id}
+                    variants={elementoVariantes}
                     initial="oculto"
                     animate="visible"
-                    className="divide-y divide-gray-100 dark:divide-gray-800/40"
+                    exit="salida"
+                    className="hover:bg-gray-50/30 dark:hover:bg-gray-800/20"
                   >
 
-                    <AnimatePresence>
+                    {/* USUARIO */}
 
-                      {usuarios.map(
-                        (usuario) => {
+                    <td className="px-6 py-4">
 
-                          const esMiCuenta =
-                            usuario.id ===
-                            miUsuarioId
+                      <div className="flex items-center gap-3">
 
-                          const procesando =
-                            usuarioProcesandoId ===
-                            usuario.id
+                        <div className="w-9 h-9 rounded-full bg-[#f1f8f4] dark:bg-[#0f1512] flex items-center justify-center text-[#218739] dark:text-[#2fa350] font-black shrink-0">
+                          {entrega.usuario_nombre
+                            ?.charAt(0)
+                            ?.toUpperCase()}
+                        </div>
 
-                          return (
+                        <div className="min-w-0">
 
-                            <motion.tr
-                              key={usuario.id}
-                              variants={
-                                elementoVariantes
-                              }
-                              initial="oculto"
-                              animate="visible"
-                              exit="salida"
-                              className="hover:bg-gray-50/30 dark:hover:bg-gray-800/20"
-                            >
+                          <div className="text-xs font-extrabold text-gray-800 dark:text-[#f2f5f3]">
+                            {entrega.usuario_nombre}
+                          </div>
 
-                              <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-[11px] text-gray-400 mt-0.5">
+                            {entrega.usuario_correo}
+                          </div>
 
-                                <span className="text-xs font-mono font-bold text-gray-500 dark:text-[#a8b3ae]">
-                                  #{usuario.id}
-                                </span>
+                          <div className="text-[10px] text-gray-400 font-mono mt-0.5">
+                            ID: {entrega.usuario_id}
+                          </div>
 
-                              </td>
+                        </div>
 
-                              <td className="px-6 py-4 whitespace-nowrap">
+                      </div>
 
-                                <div className="flex items-center gap-3">
+                    </td>
 
-                                  <div className="w-9 h-9 rounded-full bg-[#f1f8f4] dark:bg-[#0f1512] flex items-center justify-center text-[#218739] dark:text-[#2fa350] font-black">
-                                    {usuario.nombre
-                                      ?.charAt(0)
-                                      ?.toUpperCase()}
-                                  </div>
+                    {/* PUNTO */}
 
-                                  <div>
+                    <td className="px-6 py-4">
 
-                                    <div className="text-xs font-extrabold text-gray-800 dark:text-[#f2f5f3]">
-                                      {usuario.nombre}
-                                    </div>
+                      <div className="text-xs font-bold text-gray-800 dark:text-[#f2f5f3]">
+                        📍 {entrega.punto_nombre}
+                      </div>
 
-                                    {esMiCuenta && (
-                                      <span className="text-[10px] text-gray-400">
-                                        Tu cuenta
-                                      </span>
-                                    )}
+                      <div className="text-[11px] text-gray-400 mt-1">
+                        {entrega.punto_direccion}
+                      </div>
 
-                                  </div>
+                      <div className="text-[10px] text-gray-400 font-mono mt-1">
+                        ID: {entrega.punto_id}
+                      </div>
 
-                                </div>
+                    </td>
 
-                              </td>
+                    {/* TIPO */}
 
-                              <td className="px-6 py-4">
+                    <td className="px-6 py-4 whitespace-nowrap">
 
-                                <span className="text-xs text-gray-600 dark:text-[#a8b3ae]">
-                                  {usuario.correo}
-                                </span>
+                      {entrega.tipo === 'ropa' ? (
 
-                              </td>
+                        <span className="text-xs font-bold">
+                          👕 Ropa
+                        </span>
 
-                              <td className="px-6 py-4">
+                      ) : entrega.tipo === 'electronicos' ? (
 
-                                {usuario.es_admin ? (
-                                  <Badge
-                                    tipo="admin"
-                                    texto="Administrador"
-                                  />
-                                ) : (
-                                  <Badge
-                                    tipo="usuario"
-                                    texto="Usuario"
-                                  />
-                                )}
+                        <span className="text-xs font-bold">
+                          🔌 Electrónicos
+                        </span>
 
-                              </td>
+                      ) : (
 
-                              <td className="px-6 py-4">
+                        <span className="text-xs font-bold">
+                          ♻️ Reciclaje
+                        </span>
 
-                                <div className="flex items-center justify-end gap-2">
-
-                                  <LoadingButton
-                                    cargando={
-                                      procesando
-                                    }
-                                    texto={
-                                      usuario.es_admin
-                                        ? 'Quitar admin'
-                                        : 'Hacer admin'
-                                    }
-                                    textoCargando="..."
-                                    variante={
-                                      usuario.es_admin
-                                        ? 'secundario'
-                                        : 'admin'
-                                    }
-                                    onClick={() =>
-                                      cambiarAdministrador(
-                                        usuario.id
-                                      )
-                                    }
-                                    deshabilitado={
-                                      esMiCuenta ||
-                                      procesando
-                                    }
-                                  />
-
-                                  <LoadingButton
-                                    cargando={
-                                      procesando
-                                    }
-                                    texto="Eliminar"
-                                    textoCargando="..."
-                                    variante="peligro"
-                                    onClick={() =>
-                                      eliminarUsuario(
-                                        usuario.id
-                                      )
-                                    }
-                                    deshabilitado={
-                                      esMiCuenta ||
-                                      procesando
-                                    }
-                                  />
-
-                                </div>
-
-                              </td>
-
-                            </motion.tr>
-
-                          )
-                        }
                       )}
 
-                    </AnimatePresence>
+                    </td>
 
-                  </motion.tbody>
+                    {/* CANTIDAD */}
 
-                </table>
+                    <td className="px-6 py-4 whitespace-nowrap">
 
-              </div>
+                      <div className="text-sm font-black text-gray-800 dark:text-[#f2f5f3]">
+                        {entrega.cantidad}
+                      </div>
 
-            )}
+                      <div className="text-[10px] text-gray-400 uppercase font-bold">
+                        {entrega.unidad}
+                      </div>
 
-          </section>
+                    </td>
 
-        ) : pestañaActiva ===
-          'reportes' ? (
+                    {/* FECHA */}
+
+                    <td className="px-6 py-4 whitespace-nowrap">
+
+                      <div className="text-xs font-bold text-gray-700 dark:text-[#dce4e0]">
+                        {new Date(
+                          entrega.fecha
+                        ).toLocaleDateString(
+                          'es-CO'
+                        )}
+                      </div>
+
+                      <div className="text-[10px] text-gray-400 mt-1">
+                        {new Date(
+                          entrega.fecha
+                        ).toLocaleTimeString(
+                          'es-CO',
+                          {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          }
+                        )}
+                      </div>
+
+                    </td>
+
+                    {/* ESTADO */}
+
+                    <td className="px-6 py-4 whitespace-nowrap">
+
+                      <Badge
+                        tipo={
+                          entrega.estado ===
+                          'registrada'
+                            ? 'aprobado'
+                            : 'pendiente'
+                        }
+                        texto={
+                          entrega.estado
+                        }
+                      />
+
+                    </td>
+
+                    {/* OBSERVACIÓN */}
+
+                    <td className="px-6 py-4">
+
+                      {entrega.observacion ? (
+
+                        <p
+                          className="text-xs text-gray-600 dark:text-[#a8b3ae] max-w-xs"
+                          title={entrega.observacion}
+                        >
+                          {entrega.observacion}
+                        </p>
+
+                      ) : (
+
+                        <span className="text-xs text-gray-400 italic">
+                          Sin observación
+                        </span>
+
+                      )}
+
+                    </td>
+
+                  </motion.tr>
+
+                )
+              )}
+
+            </AnimatePresence>
+
+          </motion.tbody>
+
+        </table>
+
+      </div>
+
+    )}
+
+  </section>
+
+) : pestañaActiva === 'usuarios' ? (
+
+  /* =====================================================
+     PESTAÑA USUARIOS
+  ===================================================== */
+
+  <section className="bg-white dark:bg-[#1a2320] rounded-3xl border border-gray-100 dark:border-gray-800/40 shadow-xs overflow-hidden">
+
+    <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-800/40 bg-gray-50/30 dark:bg-[#121816]/30">
+
+      <div className="flex items-center justify-between gap-4">
+
+        <div>
+
+          <h3 className="text-base font-extrabold text-gray-800 dark:text-[#f2f5f3]">
+            Usuarios registrados
+          </h3>
+
+          <p className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-1">
+            Administra los usuarios registrados en Eco-TRACE.
+          </p>
+
+        </div>
+
+        <Badge
+          tipo="usuario"
+          texto={`${usuarios.length} usuarios`}
+        />
+
+      </div>
+
+    </div>
+
+    {cargando ? (
+
+      <div className="p-8 text-center text-sm text-gray-400">
+        ⏳ Cargando usuarios...
+      </div>
+
+    ) : usuarios.length === 0 ? (
+
+      <EmptyState
+        titulo="No hay usuarios"
+        descripcion="No existen usuarios registrados en el sistema."
+        icono="👥"
+      />
+
+    ) : (
+
+      <div className="overflow-x-auto">
+
+        <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800/40">
+
+          <thead>
+
+            <tr className="bg-gray-50/30 dark:bg-[#121816]/30 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">
+
+              <th className="px-6 py-4">
+                ID
+              </th>
+
+              <th className="px-6 py-4">
+                Usuario
+              </th>
+
+              <th className="px-6 py-4">
+                Correo
+              </th>
+
+              <th className="px-6 py-4">
+                Rol
+              </th>
+
+              <th className="px-6 py-4 text-right">
+                Acciones
+              </th>
+
+            </tr>
+
+          </thead>
+
+          <motion.tbody
+            variants={contenedorVariantes}
+            initial="oculto"
+            animate="visible"
+            className="divide-y divide-gray-100 dark:divide-gray-800/40"
+          >
+
+            <AnimatePresence>
+
+              {usuarios.map(
+                (usuario) => {
+
+                  const esMiCuenta =
+                    usuario.id ===
+                    miUsuarioId
+
+                  const procesando =
+                    usuarioProcesandoId ===
+                    usuario.id
+
+                  return (
+
+                    <motion.tr
+                      key={usuario.id}
+                      variants={elementoVariantes}
+                      initial="oculto"
+                      animate="visible"
+                      exit="salida"
+                      className="hover:bg-gray-50/30 dark:hover:bg-gray-800/20"
+                    >
+
+                      <td className="px-6 py-4 whitespace-nowrap">
+
+                        <span className="text-xs font-mono font-bold text-gray-500 dark:text-[#a8b3ae]">
+                          #{usuario.id}
+                        </span>
+
+                      </td>
+
+                      <td className="px-6 py-4 whitespace-nowrap">
+
+                        <div className="flex items-center gap-3">
+
+                          <div className="w-9 h-9 rounded-full bg-[#f1f8f4] dark:bg-[#0f1512] flex items-center justify-center text-[#218739] dark:text-[#2fa350] font-black">
+                            {usuario.nombre
+                              ?.charAt(0)
+                              ?.toUpperCase()}
+                          </div>
+
+                          <div>
+
+                            <div className="text-xs font-extrabold text-gray-800 dark:text-[#f2f5f3]">
+                              {usuario.nombre}
+                            </div>
+
+                            {esMiCuenta && (
+                              <span className="text-[10px] text-gray-400">
+                                Tu cuenta
+                              </span>
+                            )}
+
+                          </div>
+
+                        </div>
+
+                      </td>
+
+                      <td className="px-6 py-4">
+
+                        <span className="text-xs text-gray-600 dark:text-[#a8b3ae]">
+                          {usuario.correo}
+                        </span>
+
+                      </td>
+
+                      <td className="px-6 py-4">
+
+                        {usuario.es_admin ? (
+
+                          <Badge
+                            tipo="admin"
+                            texto="Administrador"
+                          />
+
+                        ) : (
+
+                          <Badge
+                            tipo="usuario"
+                            texto="Usuario"
+                          />
+
+                        )}
+
+                      </td>
+
+                      <td className="px-6 py-4">
+
+                        <div className="flex items-center justify-end gap-2">
+
+                          <LoadingButton
+                            cargando={
+                              procesando
+                            }
+                            texto={
+                              usuario.es_admin
+                                ? 'Quitar admin'
+                                : 'Hacer admin'
+                            }
+                            textoCargando="..."
+                            variante={
+                              usuario.es_admin
+                                ? 'secundario'
+                                : 'admin'
+                            }
+                            onClick={() =>
+                              cambiarAdministrador(
+                                usuario.id
+                              )
+                            }
+                            deshabilitado={
+                              esMiCuenta ||
+                              procesando
+                            }
+                          />
+
+                          <LoadingButton
+                            cargando={
+                              procesando
+                            }
+                            texto="Eliminar"
+                            textoCargando="..."
+                            variante="peligro"
+                            onClick={() =>
+                              eliminarUsuario(
+                                usuario.id
+                              )
+                            }
+                            deshabilitado={
+                              esMiCuenta ||
+                              procesando
+                            }
+                          />
+
+                        </div>
+
+                      </td>
+
+                    </motion.tr>
+
+                  )
+                }
+              )}
+
+            </AnimatePresence>
+
+          </motion.tbody>
+
+        </table>
+
+      </div>
+
+    )}
+
+  </section>
+
+) : pestañaActiva === 'reportes' ? (
 
           /* =====================================================
              PESTAÑA REPORTES

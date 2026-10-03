@@ -196,6 +196,8 @@ function Mapa() {
 
   const [mensajeEntrega, setMensajeEntrega] = useState('')
 
+  const [observacionEntrega, setObservacionEntrega] = useState('')
+
   const [errorEntrega, setErrorEntrega] = useState('')
 
   const [guardandoEntrega, setGuardandoEntrega] = useState(false)
@@ -604,130 +606,102 @@ function Mapa() {
 
 
   // =======================================================
-  // CREAR PUNTO
-  // =======================================================
+// CREAR PUNTO
+// =======================================================
 
-  const crearPunto = async (e) => {
-    e.preventDefault()
+const crearPunto = async (e) => {
+  e.preventDefault()
 
-    setError('')
-    setMensaje('')
+  setError('')
+  setMensaje('')
 
-    if (!ubicacionSeleccionada) {
-      setError('Primero debes seleccionar una ubicación en el mapa')
-      return
-    }
-
-    if (
-      !formulario.nombre ||
-      !formulario.descripcion ||
-      !formulario.direccion
-    ) {
-      setError('Todos los campos son obligatorios')
-      return
-    }
-
-    if (!formulario.categorias || formulario.categorias.length === 0) {
-      setError('Debes seleccionar al menos una categoría')
-      return
-    }
-
-    const token = localStorage.getItem('access_token')
-
-    if (!token) {
-      setError('Debes iniciar sesión para crear un punto')
-      return
-    }
-
-    const datosEnviar = {
-      nombre: formulario.nombre,
-      descripcion: formulario.descripcion,
-      direccion: formulario.direccion,
-      localidad: 'Ciudad Bolívar',
-      categorias: formulario.categorias,
-      latitud: ubicacionSeleccionada[0],
-      longitud: ubicacionSeleccionada[1]
-    }
-
-    try {
-      setGuardando(true)
-
-      const respuesta = await fetch('http://127.0.0.1:8000/puntos', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(datosEnviar)
-      })
-
-      const datos = await respuesta.json()
-
-      if (!respuesta.ok) {
-        setError(datos.detail || 'No se pudo crear el punto')
-        return
-      }
-
-      setMensaje('¡Punto creado correctamente! Quedó pendiente de aprobación.')
-
-      setFormulario({
-        nombre: '',
-        descripcion: '',
-        direccion: '',
-        categorias: []
-      })
-
-      setUbicacionSeleccionada(null)
-      setMostrarFormulario(false)
-
-      const respuestaPuntos = await fetch('http://127.0.0.1:8000/puntos')
-
-      if (respuestaPuntos.ok) {
-        const nuevosPuntos = await respuestaPuntos.json()
-        const puntosNormalizados = nuevosPuntos.map(normalizarPunto)
-
-        const puntosCiudadBolivar = puntosNormalizados.filter(
-          (punto) =>
-            punto.localidad?.toUpperCase() === 'CIUDAD BOLIVAR' ||
-            punto.localidad?.toUpperCase() === 'CIUDAD BOLÍVAR'
-        )
-
-        setPuntos(puntosCiudadBolivar)
-      }
-    } catch (err) {
-      console.error(err)
-      setError('No se pudo conectar con el servidor')
-    } finally {
-      setGuardando(false)
-    }
+  if (!ubicacionSeleccionada) {
+    setError('Primero debes seleccionar una ubicación en el mapa')
+    return
   }
 
+  if (
+    !formulario.nombre ||
+    !formulario.descripcion ||
+    !formulario.direccion
+  ) {
+    setError('Todos los campos son obligatorios')
+    return
+  }
 
-  // =======================================================
-  // ABRIR FORMULARIO DE ENTREGA
-  // =======================================================
+  if (!formulario.categorias || formulario.categorias.length === 0) {
+    setError('Debes seleccionar al menos una categoría')
+    return
+  }
 
-  const abrirFormularioEntrega = (punto) => {
-    setPuntoEntrega(punto)
-    setMostrarEntrega(true)
+  const token = localStorage.getItem('access_token')
 
-    const primerTipo = punto.categorias?.[0] || 'reciclaje'
+  if (!token) {
+    setError('Debes iniciar sesión para crear un punto')
+    return
+  }
 
-    setFormularioEntrega({
-      tipo:
-        primerTipo.toLowerCase().includes('ropa')
-          ? 'ropa'
-          : primerTipo.toLowerCase().includes('electr')
-          ? 'electronicos'
-          : 'reciclaje',
-      cantidad: '',
-      unidad: primerTipo.toLowerCase().includes('ropa') ? 'prendas' : 'kg'
+  const datosEnviar = {
+    nombre: formulario.nombre,
+    descripcion: formulario.descripcion,
+    direccion: formulario.direccion,
+    latitud: ubicacionSeleccionada[0],
+    longitud: ubicacionSeleccionada[1],
+    categorias: formulario.categorias
+  }
+
+  try {
+    setGuardando(true)
+
+    const respuesta = await fetch('http://127.0.0.1:8000/puntos', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(datosEnviar)
     })
 
-    setMensajeEntrega('')
-    setErrorEntrega('')
-  }
+    const datos = await respuesta.json()
 
+    if (!respuesta.ok) {
+      setError(datos.detail || 'No se pudo crear el punto')
+      return
+    }
+
+    setMensaje('¡Punto creado correctamente! Quedó pendiente de aprobación.')
+
+    setFormulario({
+      nombre: '',
+      descripcion: '',
+      direccion: '',
+      categorias: []
+    })
+
+    setUbicacionSeleccionada(null)
+    setMostrarFormulario(false)
+
+    const respuestaPuntos = await fetch('http://127.0.0.1:8000/puntos')
+
+    if (respuestaPuntos.ok) {
+      const nuevosPuntos = await respuestaPuntos.json()
+      const puntosNormalizados = nuevosPuntos.map(normalizarPunto)
+
+      const puntosCiudadBolivar = puntosNormalizados.filter(
+        (punto) =>
+          punto.localidad?.toUpperCase() === 'CIUDAD BOLIVAR' ||
+          punto.localidad?.toUpperCase() === 'CIUDAD BOLÍVAR'
+      )
+
+      setPuntos(puntosCiudadBolivar)
+    }
+  } catch (err) {
+    console.error(err)
+    setError('No se pudo conectar con el servidor')
+  } finally {
+    setGuardando(false)
+  }
+}
 
   // =======================================================
   // ABRIR FORMULARIO DE REPORTE
@@ -829,20 +803,47 @@ function Mapa() {
 
 
   // =======================================================
-  // CERRAR ENTREGA
-  // =======================================================
+// ABRIR / CERRAR ENTREGA
+// =======================================================
 
-  const cerrarFormularioEntrega = () => {
-    setMostrarEntrega(false)
-    setPuntoEntrega(null)
-    setFormularioEntrega({
-      tipo: 'reciclaje',
-      cantidad: '',
-      unidad: 'kg'
-    })
-    setMensajeEntrega('')
-    setErrorEntrega('')
-  }
+const abrirFormularioEntrega = (punto) => {
+  setPuntoEntrega(punto)
+  setMostrarEntrega(true)
+
+  const primerTipo = punto.categorias?.[0] || 'reciclaje'
+
+  setFormularioEntrega({
+    tipo:
+      primerTipo.toLowerCase().includes('ropa')
+        ? 'ropa'
+        : primerTipo.toLowerCase().includes('electr')
+        ? 'electronicos'
+        : 'reciclaje',
+    cantidad: '',
+    unidad: primerTipo.toLowerCase().includes('ropa')
+      ? 'prendas'
+      : 'kg'
+  })
+
+  setObservacionEntrega('')
+  setMensajeEntrega('')
+  setErrorEntrega('')
+}
+
+const cerrarFormularioEntrega = () => {
+  setMostrarEntrega(false)
+  setPuntoEntrega(null)
+
+  setFormularioEntrega({
+    tipo: 'reciclaje',
+    cantidad: '',
+    unidad: 'kg'
+  })
+
+  setObservacionEntrega('')
+  setMensajeEntrega('')
+  setErrorEntrega('')
+}
 
 
   // =======================================================
@@ -860,81 +861,83 @@ function Mapa() {
   }
 
 
-  // =======================================================
-  // REGISTRAR ENTREGA
-  // =======================================================
+  /// =======================================================
+// REGISTRAR ENTREGA
+// =======================================================
 
-  const registrarEntrega = async (e) => {
-    e.preventDefault()
+const registrarEntrega = async (e) => {
+  e.preventDefault()
 
-    setErrorEntrega('')
-    setMensajeEntrega('')
+  setErrorEntrega('')
+  setMensajeEntrega('')
 
-    if (!puntoEntrega) {
-      setErrorEntrega('No se seleccionó ningún punto')
-      return
-    }
-
-    if (!formularioEntrega.cantidad) {
-      setErrorEntrega('Ingresa la cantidad entregada')
-      return
-    }
-
-    if (Number(formularioEntrega.cantidad) <= 0) {
-      setErrorEntrega('La cantidad debe ser mayor que 0')
-      return
-    }
-
-    const token = localStorage.getItem('access_token')
-
-    if (!token) {
-      setErrorEntrega('Debes iniciar sesión para registrar una entrega')
-      return
-    }
-
-    const datosEnviar = {
-      punto_id: puntoEntrega.id,
-      tipo: formularioEntrega.tipo,
-      cantidad: Number(formularioEntrega.cantidad),
-      unidad: formularioEntrega.unidad
-    }
-
-    try {
-      setGuardandoEntrega(true)
-
-      const respuesta = await fetch('http://127.0.0.1:8000/entregas', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(datosEnviar)
-      })
-
-      const datos = await respuesta.json()
-
-      if (!respuesta.ok) {
-        setErrorEntrega(datos.detail || 'No se pudo registrar la entrega')
-        return
-      }
-
-      setMensajeEntrega(
-        '¡Entrega registrada correctamente! Puedes verla en tu historial.'
-      )
-
-      setFormularioEntrega({
-        tipo: formularioEntrega.tipo,
-        cantidad: '',
-        unidad: formularioEntrega.unidad
-      })
-    } catch (err) {
-      console.error(err)
-      setErrorEntrega('No se pudo conectar con el servidor')
-    } finally {
-      setGuardandoEntrega(false)
-    }
+  if (!puntoEntrega) {
+    setErrorEntrega('No se seleccionó ningún punto')
+    return
   }
 
+  if (!formularioEntrega.cantidad) {
+    setErrorEntrega('Ingresa la cantidad entregada')
+    return
+  }
+
+  if (Number(formularioEntrega.cantidad) <= 0) {
+    setErrorEntrega('La cantidad debe ser mayor que 0')
+    return
+  }
+
+  const token = localStorage.getItem('access_token')
+
+  if (!token) {
+    setErrorEntrega('Debes iniciar sesión para registrar una entrega')
+    return
+  }
+
+  const datosEnviar = {
+    punto_id: puntoEntrega.id,
+    tipo: formularioEntrega.tipo,
+    cantidad: Number(formularioEntrega.cantidad),
+    unidad: formularioEntrega.unidad,
+    observacion: observacionEntrega.trim() || null
+  }
+
+  try {
+    setGuardandoEntrega(true)
+
+    const respuesta = await fetch('http://127.0.0.1:8000/entregas', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(datosEnviar)
+    })
+
+    const datos = await respuesta.json()
+
+    if (!respuesta.ok) {
+      setErrorEntrega(datos.detail || 'No se pudo registrar la entrega')
+      return
+    }
+
+    setMensajeEntrega(
+      '¡Entrega registrada correctamente! Puedes verla en tu historial.'
+    )
+
+    setFormularioEntrega({
+      tipo: formularioEntrega.tipo,
+      cantidad: '',
+      unidad: formularioEntrega.unidad
+    })
+
+    setObservacionEntrega('')
+  } catch (err) {
+    console.error(err)
+    setErrorEntrega('No se pudo conectar con el servidor')
+  } finally {
+    setGuardandoEntrega(false)
+  }
+}
 
   // =======================================================
   // RENDER
@@ -1326,245 +1329,496 @@ function Mapa() {
             )}
 
             {/* MARCADORES PUNTOS */}
-            {puntosFiltrados.map((punto) => (
-              <Marker
-                key={punto.id}
-                position={[punto.latitud, punto.longitud]}
-                icon={obtenerIconoPorCategorias(punto.categorias)}
+{puntosFiltrados.map((punto) => (
+  <Marker
+    key={punto.id}
+    position={[punto.latitud, punto.longitud]}
+    icon={obtenerIconoPorCategorias(punto.categorias)}
+  >
+    <Popup>
+      <div className="p-1 max-w-xs font-sans">
+
+        <div className="mb-2">
+          <CategoriasBadges categorias={punto.categorias} />
+        </div>
+
+        <h3 className="font-extrabold text-sm text-gray-900 mb-1">
+          {punto.nombre}
+        </h3>
+
+        <p className="text-xs text-gray-600 leading-relaxed mb-3">
+          {punto.descripcion}
+        </p>
+
+        <div className="text-[11px] text-gray-500 border-t border-gray-100 pt-2 space-y-1">
+          <div>
+            📍 <strong>Dirección:</strong> {punto.direccion}
+          </div>
+
+          <div>
+            🏙️ <strong>Localidad:</strong> {punto.localidad}
+          </div>
+        </div>
+
+        {/* RUTA */}
+        <button
+          type="button"
+          onClick={() => calcularRuta(punto)}
+          disabled={cargandoRuta && puntoRuta?.id === punto.id}
+          className="w-full mt-4 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-60"
+        >
+          {cargandoRuta && puntoRuta?.id === punto.id
+            ? '🚗 Calculando ruta...'
+            : '🚗 Cómo llegar'}
+        </button>
+
+        {/* REPORTE */}
+        <button
+          type="button"
+          onClick={() => abrirFormularioReporte(punto)}
+          className="w-full mt-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
+        >
+          🚩 Reportar punto
+        </button>
+
+        {/* ENTREGA */}
+        <button
+          type="button"
+          onClick={() => abrirFormularioEntrega(punto)}
+          className="w-full mt-2 px-3 py-2 bg-[#218739] hover:bg-[#176b2c] text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+        >
+          ♻️ Registrar entrega
+        </button>
+
+      </div>
+    </Popup>
+  </Marker>
+))}
+
+{/* UBICACIÓN NUEVA */}
+{ubicacionSeleccionada && (
+  <Marker position={ubicacionSeleccionada}>
+    <Popup>
+      <div className="p-1 font-sans text-xs">
+        <strong className="text-[#218739] block mb-1">
+          📍 Nueva ubicación marcada
+        </strong>
+
+        <span>
+          Completa los datos en el panel superior para enviarlo a moderación.
+        </span>
+      </div>
+    </Popup>
+  </Marker>
+)}
+</MapContainer>
+
+{/* =========================================================
+    MODAL REGISTRAR ENTREGA
+========================================================= */}
+<AnimatePresence>
+  {mostrarEntrega && puntoEntrega && (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="absolute inset-0 z-[2000] bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="titulo-modal-entrega"
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 15 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 15 }}
+        transition={{ duration: 0.2 }}
+        className="w-full max-w-md max-h-[90%] overflow-y-auto bg-white dark:bg-[#1a2320] rounded-3xl shadow-2xl border border-gray-200 dark:border-gray-700"
+        onClick={(e) => e.stopPropagation()}
+      >
+
+        {/* ENCABEZADO */}
+        <div className="relative px-6 pt-6 pb-4 border-b border-gray-100 dark:border-gray-700">
+
+          <button
+            type="button"
+            onClick={cerrarFormularioEntrega}
+            className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+            aria-label="Cerrar"
+          >
+            ✕
+          </button>
+
+          <div className="flex items-center gap-3 pr-10">
+            <div className="w-12 h-12 rounded-2xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-2xl">
+              ♻️
+            </div>
+
+            <div>
+              <h2
+                id="titulo-modal-entrega"
+                className="text-xl font-extrabold text-gray-900 dark:text-white"
               >
-                <Popup>
-                  <div className="p-1 max-w-xs font-sans">
-                    <div className="mb-2">
-                      <CategoriasBadges categorias={punto.categorias} />
-                    </div>
+                Registrar entrega
+              </h2>
 
-                    <h3 className="font-extrabold text-sm text-gray-900 mb-1">
-                      {punto.nombre}
-                    </h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Registra los residuos que entregaste en este punto.
+              </p>
+            </div>
+          </div>
+        </div>
 
-                    <p className="text-xs text-gray-600 leading-relaxed mb-3">
-                      {punto.descripcion}
-                    </p>
+        {/* CONTENIDO */}
+        <div className="px-6 py-5">
 
-                    <div className="text-[11px] text-gray-500 border-t border-gray-100 pt-2 space-y-1">
-                      <div>
-                        📍 <strong>Dirección:</strong> {punto.direccion}
-                      </div>
-                      <div>
-                        🏙️ <strong>Localidad:</strong> {punto.localidad}
-                      </div>
-                    </div>
+          {/* PUNTO SELECCIONADO */}
+          <div className="mb-5 rounded-2xl bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-900/40 p-4">
 
-                    {/* RUTA */}
-                    <button
-                      type="button"
-                      onClick={() => calcularRuta(punto)}
-                      disabled={cargandoRuta && puntoRuta?.id === punto.id}
-                      className="w-full mt-4 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-60"
-                    >
-                      {cargandoRuta && puntoRuta?.id === punto.id
-                        ? '🚗 Calculando ruta...'
-                        : '🚗 Cómo llegar'}
-                    </button>
+            <p className="text-[11px] uppercase tracking-wide font-bold text-green-700 dark:text-green-400 mb-1">
+              Punto seleccionado
+            </p>
 
-                    {/* REPORTE */}
-                    <button
-                      type="button"
-                      onClick={() => abrirFormularioReporte(punto)}
-                      className="w-full mt-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
-                    >
-                      🚩 Reportar punto
-                    </button>
+            <p className="text-base font-extrabold text-gray-900 dark:text-white">
+              {puntoEntrega.nombre}
+            </p>
 
-                    {/* FORMULARIO REPORTE */}
-                    {mostrarReporte && puntoReporte?.id === punto.id && (
-                      <div className="mt-4 pt-4 border-t border-gray-200">
-                        <h4 className="font-extrabold text-sm text-gray-900 mb-2">
-                          🚩 Reportar punto ecológico
-                        </h4>
-
-                        <p className="text-[11px] text-gray-500 mb-3">
-                          Indica qué problema encontraste en {punto.nombre}.
-                        </p>
-
-                        <form onSubmit={registrarReporte} className="space-y-3">
-                          <textarea
-                            value={motivoReporte}
-                            onChange={(e) => {
-                              setMotivoReporte(e.target.value)
-                              setErrorReporte('')
-                              setMensajeReporte('')
-                            }}
-                            minLength={5}
-                            maxLength={500}
-                            required
-                            rows={3}
-                            placeholder="Ej.: el establecimiento está cerrado o ya no recibe materiales..."
-                            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs resize-y"
-                          />
-
-                          <p className="text-[10px] text-gray-500">
-                            {motivoReporte.length}/500 caracteres
-                          </p>
-
-                          {errorReporte && (
-                            <div className="p-2.5 bg-red-50 text-red-600 rounded-lg text-[11px] font-bold">
-                              ⚠️ {errorReporte}
-                            </div>
-                          )}
-
-                          {mensajeReporte && (
-                            <div className="p-2.5 bg-green-50 text-green-700 rounded-lg text-[11px] font-bold">
-                              ✅ {mensajeReporte}
-                            </div>
-                          )}
-
-                          <div className="flex gap-2">
-                            <button
-                              type="submit"
-                              disabled={guardandoReporte}
-                              className="flex-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold disabled:opacity-60"
-                            >
-                              {guardandoReporte ? 'Enviando...' : 'Enviar reporte'}
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={cerrarFormularioReporte}
-                              className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-bold"
-                            >
-                              Cancelar
-                            </button>
-                          </div>
-                        </form>
-                      </div>
-                    )}
-
-                    {/* ENTREGA */}
-                    <button
-                      type="button"
-                      onClick={() => abrirFormularioEntrega(punto)}
-                      className="w-full mt-2 px-3 py-2 bg-[#218739] hover:bg-[#176b2c] text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
-                    >
-                      ♻️ Registrar entrega
-                    </button>
-
-                    {/* FORMULARIO ENTREGA */}
-                    {mostrarEntrega && puntoEntrega?.id === punto.id && (
-                      <div className="mt-4 pt-4 border-t border-gray-200">
-                        <h4 className="font-extrabold text-sm text-gray-900 mb-3">
-                          Registrar entrega
-                        </h4>
-
-                        <p className="text-[11px] text-gray-500 mb-3">
-                          Punto: {punto.nombre}
-                        </p>
-
-                        <form onSubmit={registrarEntrega} className="space-y-3">
-                          <div>
-                            <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                              Tipo
-                            </label>
-
-                            <select
-                              name="tipo"
-                              value={formularioEntrega.tipo}
-                              onChange={manejarCambioEntrega}
-                              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs bg-white"
-                            >
-                              <option value="reciclaje">♻️ Reciclaje</option>
-                              <option value="ropa">👕 Ropa</option>
-                              <option value="electronicos">💻 Electrónicos</option>
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                              Cantidad
-                            </label>
-
-                            <input
-                              type="number"
-                              name="cantidad"
-                              min="0.01"
-                              step="0.01"
-                              placeholder="Ej: 5"
-                              value={formularioEntrega.cantidad}
-                              onChange={manejarCambioEntrega}
-                              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                              Unidad
-                            </label>
-
-                            <select
-                              name="unidad"
-                              value={formularioEntrega.unidad}
-                              onChange={manejarCambioEntrega}
-                              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs bg-white"
-                            >
-                              <option value="kg">Kilogramos (kg)</option>
-                              <option value="unidades">Unidades</option>
-                              <option value="prendas">Prendas</option>
-                            </select>
-                          </div>
-
-                          {errorEntrega && (
-                            <div className="p-2.5 bg-red-50 text-red-600 rounded-lg text-[11px] font-bold">
-                              ⚠️ {errorEntrega}
-                            </div>
-                          )}
-
-                          {mensajeEntrega && (
-                            <div className="p-2.5 bg-green-50 text-green-700 rounded-lg text-[11px] font-bold">
-                              ✅ {mensajeEntrega}
-                            </div>
-                          )}
-
-                          <div className="flex gap-2">
-                            <button
-                              type="submit"
-                              disabled={guardandoEntrega}
-                              className="flex-1 px-3 py-2 bg-[#218739] hover:bg-[#176b2c] text-white rounded-lg text-xs font-bold disabled:opacity-60"
-                            >
-                              {guardandoEntrega ? 'Guardando...' : 'Registrar'}
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={cerrarFormularioEntrega}
-                              className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-bold"
-                            >
-                              Cancelar
-                            </button>
-                          </div>
-                        </form>
-                      </div>
-                    )}
-                  </div>
-                </Popup>
-              </Marker>
-            ))}
-
-            {/* UBICACIÓN NUEVA */}
-            {ubicacionSeleccionada && (
-              <Marker position={ubicacionSeleccionada}>
-                <Popup>
-                  <div className="p-1 font-sans text-xs">
-                    <strong className="text-[#218739] block mb-1">
-                      📍 Nueva ubicación marcada
-                    </strong>
-                    <span>
-                      Completa los datos en el panel superior para enviarlo a moderación.
-                    </span>
-                  </div>
-                </Popup>
-              </Marker>
+            {puntoEntrega.categorias?.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {puntoEntrega.categorias.map((categoria, index) => (
+                  <span
+                    key={`${categoria}-${index}`}
+                    className="px-2.5 py-1 rounded-full bg-white dark:bg-gray-800 text-[11px] font-bold text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700"
+                  >
+                    {categoria}
+                  </span>
+                ))}
+              </div>
             )}
-          </MapContainer>
+          </div>
+
+          <form onSubmit={registrarEntrega} className="space-y-5">
+
+            {/* TIPO */}
+            <div>
+              <label className="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2">
+                Tipo de residuo
+              </label>
+
+              <div className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200">
+                {formularioEntrega.tipo === 'ropa' && '👕 Ropa'}
+                {formularioEntrega.tipo === 'electronicos' && '💻 Electrónicos'}
+                {formularioEntrega.tipo === 'reciclaje' && '♻️ Reciclaje'}
+              </div>
+
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1.5">
+                Se determina automáticamente según el punto seleccionado.
+              </p>
+            </div>
+
+            {/* CANTIDAD */}
+            <div>
+              <label
+                htmlFor="cantidad-entrega"
+                className="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2"
+              >
+                Cantidad entregada *
+              </label>
+
+              <input
+                id="cantidad-entrega"
+                type="number"
+                name="cantidad"
+                min="0.01"
+                step="0.01"
+                placeholder="Ej: 5"
+                value={formularioEntrega.cantidad}
+                onChange={manejarCambioEntrega}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
+                required
+              />
+            </div>
+
+            {/* UNIDAD */}
+            <div>
+              <label
+                htmlFor="unidad-entrega"
+                className="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2"
+              >
+                Unidad *
+              </label>
+
+              <select
+                id="unidad-entrega"
+                name="unidad"
+                value={formularioEntrega.unidad}
+                onChange={manejarCambioEntrega}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
+              >
+                <option value="kg">Kilogramos (kg)</option>
+                <option value="unidades">Unidades</option>
+                <option value="prendas">Prendas</option>
+              </select>
+            </div>
+
+            {/* FECHA */}
+            <div>
+              <label className="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2">
+                Fecha de entrega
+              </label>
+
+              <div className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200">
+                📅 {new Date().toLocaleDateString('es-CO', {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric'
+                })}
+              </div>
+
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1.5">
+                Fecha registrada automáticamente.
+              </p>
+            </div>
+
+            {/* OBSERVACIÓN */}
+            <div>
+              <label
+                htmlFor="observacion-entrega"
+                className="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2"
+              >
+                Observación
+                <span className="font-normal text-gray-400 ml-1">
+                  (opcional)
+                </span>
+              </label>
+
+              <textarea
+                id="observacion-entrega"
+                value={observacionEntrega}
+                onChange={(e) => setObservacionEntrega(e.target.value)}
+                rows="3"
+                placeholder="Puedes agregar algún detalle sobre la entrega..."
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition resize-none"
+              />
+            </div>
+
+            {/* ERROR */}
+            {errorEntrega && (
+              <div className="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/40 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+                ⚠️ {errorEntrega}
+              </div>
+            )}
+
+            {/* ÉXITO */}
+            {mensajeEntrega && (
+              <div className="rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-900/40 px-4 py-3 text-sm text-green-700 dark:text-green-300">
+                ✅ {mensajeEntrega}
+              </div>
+            )}
+
+            {/* BOTONES */}
+            <div className="flex gap-3 pt-2">
+
+              <button
+                type="button"
+                onClick={cerrarFormularioEntrega}
+                className="flex-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-bold text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="submit"
+                disabled={guardandoEntrega}
+                className="flex-1 px-4 py-3 rounded-xl bg-[#218739] hover:bg-[#176b2c] disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-sm transition shadow-sm"
+              >
+                {guardandoEntrega
+                  ? 'Guardando...'
+                  : 'Registrar entrega'}
+              </button>
+
+            </div>
+
+          </form>
+        </div>
+      </motion.div>
+    </motion.div>
+  )}
+</AnimatePresence>
+
+
+{/* =========================================================
+    MODAL REPORTAR PUNTO
+========================================================= */}
+<AnimatePresence>
+  {mostrarReporte && puntoReporte && (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="absolute inset-0 z-[2000] bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="titulo-modal-reporte"
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 15 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 15 }}
+        transition={{ duration: 0.2 }}
+        className="w-full max-w-md bg-white dark:bg-[#1a2320] rounded-3xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+
+        {/* ENCABEZADO */}
+        <div className="relative px-6 pt-6 pb-4 border-b border-gray-100 dark:border-gray-700">
+
+          <button
+            type="button"
+            onClick={cerrarFormularioReporte}
+            className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+            aria-label="Cerrar"
+          >
+            ✕
+          </button>
+
+          <div className="flex items-center gap-3 pr-10">
+            <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-2xl">
+              🚩
+            </div>
+
+            <div>
+              <h2
+                id="titulo-modal-reporte"
+                className="text-xl font-extrabold text-gray-900 dark:text-white"
+              >
+                Reportar punto ecológico
+              </h2>
+
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Ayúdanos a mantener actualizada la información de los puntos.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* CONTENIDO */}
+        <div className="px-6 py-5">
+
+          {/* PUNTO SELECCIONADO */}
+          <div className="mb-5 rounded-2xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/40 p-4">
+
+            <p className="text-[11px] uppercase tracking-wide font-bold text-red-700 dark:text-red-400 mb-1">
+              Punto seleccionado
+            </p>
+
+            <p className="text-base font-extrabold text-gray-900 dark:text-white">
+              {puntoReporte.nombre}
+            </p>
+
+            {puntoReporte.direccion && (
+              <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                📍 {puntoReporte.direccion}
+              </p>
+            )}
+
+            {puntoReporte.localidad && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                🏙️ {puntoReporte.localidad}
+              </p>
+            )}
+          </div>
+
+          <form onSubmit={registrarReporte} className="space-y-5">
+
+            {/* MOTIVO */}
+            <div>
+              <label
+                htmlFor="motivo-reporte"
+                className="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2"
+              >
+                ¿Qué problema encontraste? *
+              </label>
+
+              <textarea
+                id="motivo-reporte"
+                value={motivoReporte}
+                onChange={(e) => {
+                  setMotivoReporte(e.target.value)
+                  setErrorReporte('')
+                  setMensajeReporte('')
+                }}
+                minLength={5}
+                maxLength={500}
+                required
+                rows={5}
+                placeholder="Ej.: el establecimiento está cerrado o ya no recibe materiales..."
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition resize-none"
+              />
+
+              <div className="flex justify-between items-center mt-1.5">
+                <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                  Describe claramente el problema encontrado.
+                </p>
+
+                <p
+                  className={`text-[10px] font-bold ${
+                    motivoReporte.length >= 450
+                      ? 'text-red-500'
+                      : 'text-gray-400'
+                  }`}
+                >
+                  {motivoReporte.length}/500
+                </p>
+              </div>
+            </div>
+
+            {/* ERROR */}
+            {errorReporte && (
+              <div className="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/40 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+                ⚠️ {errorReporte}
+              </div>
+            )}
+
+            {/* ÉXITO */}
+            {mensajeReporte && (
+              <div className="rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-900/40 px-4 py-3 text-sm text-green-700 dark:text-green-300">
+                ✅ {mensajeReporte}
+              </div>
+            )}
+
+            {/* BOTONES */}
+            <div className="flex gap-3 pt-2">
+
+              <button
+                type="button"
+                onClick={cerrarFormularioReporte}
+                className="flex-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-bold text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="submit"
+                disabled={guardandoReporte}
+                className="flex-1 px-4 py-3 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-sm transition shadow-sm"
+              >
+                {guardandoReporte
+                  ? 'Enviando...'
+                  : 'Enviar reporte'}
+              </button>
+
+            </div>
+
+          </form>
+        </div>
+      </motion.div>
+    </motion.div>
+  )}
+</AnimatePresence>
+
+{/* BOTÓN DE CAPAS */}
 
           {/* BOTÓN DE CAPAS */}
           <div className="absolute top-4 right-4 z-[1000]">

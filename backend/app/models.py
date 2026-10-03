@@ -299,11 +299,14 @@ class Entrega(SQLModel, table=True):
         default_factory=datetime.now
     )
 
-    # Estado de la entrega
+        # Estado de la entrega
     # registrada, confirmada, cancelada
     estado: str = Field(
         default="registrada"
     )
+
+    # Observación opcional de la entrega
+    observacion: Optional[str] = None
 
     usuario: Optional[Usuario] = Relationship(
         back_populates="entregas"
@@ -319,14 +322,18 @@ class Entrega(SQLModel, table=True):
 # =========================================================
 
 class EntregaRegistro(SQLModel):
-
+    
     punto_id: int
-
+    
     tipo: str
-
+    
     cantidad: float
-
+    
     unidad: str
+    
+    observacion: Optional[str] = None
+    
+    
 
 
 # =========================================================
@@ -334,22 +341,48 @@ class EntregaRegistro(SQLModel):
 # =========================================================
 
 class EntregaRespuesta(SQLModel):
+    
+    id: int
+    
+    usuario_id: int
+    
+    punto_id: int
+    
+    tipo: str
+    
+    cantidad: float
+    
+    unidad: str
+    
+    fecha: datetime
+    
+    estado: str
+    
+    observacion: Optional[str] = None
+    
+# =========================================================
+# RESPUESTA DE ENTREGA PARA ADMINISTRADOR
+# =========================================================
+
+class EntregaAdminRespuesta(SQLModel):
 
     id: int
 
     usuario_id: int
+    usuario_nombre: str
+    usuario_correo: str
 
     punto_id: int
+    punto_nombre: str
+    punto_direccion: str
 
     tipo: str
-
     cantidad: float
-
     unidad: str
-
     fecha: datetime
-
     estado: str
+
+    observacion: Optional[str] = None
 
 
 # =========================================================

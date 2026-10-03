@@ -38,6 +38,29 @@ function Historial() {
         }
     };
 
+    const obtenerTipoEntrega = (tipo) => {
+        switch (tipo) {
+            case "ropa":
+                return {
+                    nombre: "Donación de ropa",
+                    icono: "👕",
+                };
+
+            case "electronicos":
+                return {
+                    nombre: "Residuos electrónicos",
+                    icono: "🔌",
+                };
+
+            case "reciclaje":
+            default:
+                return {
+                    nombre: "Reciclaje",
+                    icono: "♻️",
+                };
+        }
+    };
+
     if (cargando) {
         return (
             <div className="historial-container">
@@ -77,47 +100,59 @@ function Historial() {
 
             <div className="historial-lista">
 
-                {entregas.map((entrega) => (
-                    <div
-                        className="historial-card"
-                        key={entrega.id}
-                    >
+                {entregas.map((entrega) => {
 
-                        <div className="historial-card-icon">
-                            ♻️
+                    const tipoEntrega = obtenerTipoEntrega(entrega.tipo);
+
+                    return (
+                        <div
+                            className="historial-card"
+                            key={entrega.id}
+                        >
+
+                            <div className="historial-card-icon">
+                                {tipoEntrega.icono}
+                            </div>
+
+                            <div className="historial-card-info">
+
+                                <h2>
+                                    {tipoEntrega.nombre}
+                                </h2>
+
+                                <p>
+                                    <strong>Cantidad:</strong>{" "}
+                                    {entrega.cantidad} {entrega.unidad}
+                                </p>
+
+                                <p>
+                                    <strong>Punto:</strong>{" "}
+                                    #{entrega.punto_id}
+                                </p>
+
+                                <p>
+                                    <strong>Fecha:</strong>{" "}
+                                    {new Date(
+                                        entrega.fecha
+                                    ).toLocaleDateString("es-CO")}
+                                </p>
+
+                                {entrega.observacion && (
+                                    <p>
+                                        <strong>Observación:</strong>{" "}
+                                        {entrega.observacion}
+                                    </p>
+                                )}
+
+                            </div>
+
+                            <div className="historial-card-estado">
+                                {entrega.estado}
+                            </div>
+
                         </div>
-
-                        <div className="historial-card-info">
-
-                            <h2>
-                                {entrega.tipo}
-                            </h2>
-
-                            <p>
-                                <strong>Cantidad:</strong>{" "}
-                                {entrega.cantidad} {entrega.unidad}
-                            </p>
-
-                            <p>
-                                <strong>Punto:</strong>{" "}
-                                #{entrega.punto_id}
-                            </p>
-
-                            <p>
-                                <strong>Fecha:</strong>{" "}
-                                {new Date(
-                                    entrega.fecha
-                                ).toLocaleDateString("es-CO")}
-                            </p>
-
-                        </div>
-
-                        <div className="historial-card-estado">
-                            {entrega.estado}
-                        </div>
-
-                    </div>
-                ))}
+                    );
+                })}
 
             </div>
 
@@ -126,3 +161,4 @@ function Historial() {
 }
 
 export default Historial;
+

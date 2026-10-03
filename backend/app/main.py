@@ -33,6 +33,7 @@ from app.models import (
     Entrega,
     EntregaRegistro,
     EntregaRespuesta,
+    EntregaAdminRespuesta,
     CodigoRecuperacion,
     SolicitarRecuperacion,
     VerificarCodigo,
@@ -1510,9 +1511,10 @@ def registrar_entrega(
             tipo=datos.tipo,
             cantidad=datos.cantidad,
             unidad=datos.unidad,
-            estado="registrada"
+            estado="registrada",
+            observacion=datos.observacion
         )
-
+        
         session.add(nueva_entrega)
         session.commit()
         session.refresh(nueva_entrega)
@@ -1547,6 +1549,82 @@ def listar_mis_entregas(
         ).all()
 
         return entregas
+    
+    # =========================================================
+# ADMIN - LISTAR TODAS LAS ENTREGAS
+# =========================================================
+
+@app.get(
+    "/admin/entregas",
+    response_model=list[EntregaAdminRespuesta]
+)
+def listar_entregas_admin(
+    administrador: Usuario = Depends(
+        obtener_admin_actual
+    )
+):
+
+    with Session(engine) as session:
+
+        entregas = session.exec(
+            select(Entrega)
+            .order_by(
+                Entrega.fecha.desc()
+            )
+        ).all()
+
+        resultado = []
+
+        for entrega in entregas:
+
+            usuario = session.get(
+                Usuario,
+                entrega.usuario_id
+            )
+
+            punto = session.get(
+                Punto,
+                entrega.punto_id
+            )
+
+            resultado.append(
+                EntregaAdminRespuesta(
+                    id=entrega.id,
+
+                    usuario_id=entrega.usuario_id,
+                    usuario_nombre=(
+                        usuario.nombre
+                        if usuario
+                        else "Usuario no encontrado"
+                    ),
+                    usuario_correo=(
+                        usuario.correo
+                        if usuario
+                        else ""
+                    ),
+
+                    punto_id=entrega.punto_id,
+                    punto_nombre=(
+                        punto.nombre
+                        if punto
+                        else "Punto no encontrado"
+                    ),
+                    punto_direccion=(
+                        punto.direccion
+                        if punto
+                        else ""
+                    ),
+
+                    tipo=entrega.tipo,
+                    cantidad=entrega.cantidad,
+                    unidad=entrega.unidad,
+                    fecha=entrega.fecha,
+                    estado=entrega.estado,
+                    observacion=entrega.observacion
+                )
+            )
+
+        return resultado
 
 # =========================================================
 # REPORTES - REGISTRAR REPORTE DE UN PUNTO
