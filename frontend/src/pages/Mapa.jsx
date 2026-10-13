@@ -628,8 +628,7 @@ const crearPunto = async (e) => {
   if (
     !formulario.nombre ||
     !formulario.descripcion ||
-    !formulario.direccion ||
-    !formulario.localidad
+    !formulario.direccion
   ) {
     setError('Todos los campos son obligatorios')
     return
@@ -651,7 +650,7 @@ const crearPunto = async (e) => {
     nombre: formulario.nombre.trim(),
     descripcion: formulario.descripcion.trim(),
     direccion: formulario.direccion.trim(),
-    localidad: (formulario.localidad || 'Ciudad Bolívar').trim(),
+    localidad: 'Ciudad Bolívar',
     latitud: ubicacionSeleccionada[0],
     longitud: ubicacionSeleccionada[1],
     categorias: formulario.categorias
@@ -1141,7 +1140,7 @@ const registrarEntrega = async (e) => {
               </h2>
 
               <form onSubmit={crearPunto} className="space-y-5">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 dark:text-[#f2f5f3] uppercase tracking-wider mb-2">
                       Nombre del punto
@@ -1165,20 +1164,6 @@ const registrarEntrega = async (e) => {
                       name="direccion"
                       placeholder="Ej: Carrera 50 # 20-30"
                       value={formulario.direccion}
-                      onChange={manejarCambioFormulario}
-                      className="w-full px-4 py-2.5 text-xs rounded-xl bg-gray-50 dark:bg-[#0f1512] text-gray-900 dark:text-white border border-gray-200 dark:border-gray-800 focus:outline-hidden focus:border-[#218739] dark:focus:border-[#2fa350] transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 dark:text-[#f2f5f3] uppercase tracking-wider mb-2">
-                      Localidad
-                    </label>
-                    <input
-                      type="text"
-                      name="localidad"
-                      placeholder="Ej: Ciudad Bolívar"
-                      value={formulario.localidad}
                       onChange={manejarCambioFormulario}
                       className="w-full px-4 py-2.5 text-xs rounded-xl bg-gray-50 dark:bg-[#0f1512] text-gray-900 dark:text-white border border-gray-200 dark:border-gray-800 focus:outline-hidden focus:border-[#218739] dark:focus:border-[#2fa350] transition-all"
                     />
