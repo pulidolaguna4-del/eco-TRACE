@@ -69,3 +69,60 @@ export function obtenerIconoYColorPorCategorias(categorias = []) {
 
   return { emoji: '📍', color: '#218739' }
 }
+
+/**
+ * Convierte cualquier respuesta de error de FastAPI (o error JS/Red) en un string legible para React.
+ * Evita renderizar objetos directamente como hijos de React.
+ */
+export function formatearMensajeError(errorResponse, mensajePorDefecto = 'Ocurrió un error inesperado') {
+  if (!errorResponse) return mensajePorDefecto
+
+  // Si es una instancia de Error (excepción JavaScript)
+  if (errorResponse instanceof Error) {
+    return errorResponse.message || mensajePorDefecto
+  }
+
+  // Extraer el campo 'detail' o usar el objeto directamente
+  const detail = errorResponse.detail !== undefined ? errorResponse.detail : errorResponse
+
+  // Si 'detail' es un string directo
+  if (typeof detail === 'string' && detail.trim() !== '') {
+    return detail
+  }
+
+  // Si 'detail' es una lista de objetos de validación de FastAPI / Pydantic [{loc, msg, type, input}]
+  if (Array.isArray(detail)) {
+    if (detail.length === 0) return mensajePorDefecto
+
+    const mensajes = detail.map((err) => {
+      if (typeof err === 'string') return err
+      if (typeof err === 'object' && err !== null) {
+        const locArray = Array.isArray(err.loc) ? err.loc.filter((item) => item !== 'body') : []
+        const campo = locArray.join('.')
+
+        if (err.type === 'missing') {
+          return campo ? `El campo '${campo}' es obligatorio.` : 'Falta un campo obligatorio.'
+        }
+
+        const msg = err.msg || 'Dato inválido'
+        return campo ? `El campo '${campo}': ${msg}` : msg
+      }
+      return String(err)
+    })
+
+    return mensajes.join(' | ')
+  }
+
+  // Si 'detail' es un objeto
+  if (typeof detail === 'object' && detail !== null) {
+    if (typeof detail.msg === 'string') return detail.msg
+    if (typeof detail.message === 'string') return detail.message
+    try {
+      return JSON.stringify(detail)
+    } catch {
+      return mensajePorDefecto
+    }
+  }
+
+  return mensajePorDefecto
+}

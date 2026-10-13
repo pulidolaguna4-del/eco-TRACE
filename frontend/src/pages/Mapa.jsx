@@ -20,7 +20,8 @@ import 'leaflet/dist/leaflet.css'
 import {
   normalizarPunto,
   CATEGORIAS_DISPONIBLES,
-  obtenerIconoYColorPorCategorias
+  obtenerIconoYColorPorCategorias,
+  formatearMensajeError
 } from '../utils/puntoUtils'
 import { CategoriasBadges } from '../components/CategoriasBadges'
 
@@ -339,7 +340,7 @@ function Mapa() {
         }
       } catch (err) {
         console.error(err)
-        setError('No se pudieron cargar los datos del mapa')
+        setError(formatearMensajeError(err, 'No se pudieron cargar los datos del mapa'))
       } finally {
         setCargando(false)
       }
@@ -486,7 +487,7 @@ function Mapa() {
           })
         } catch (err) {
           console.error(err)
-          setErrorRuta('No se pudo calcular la ruta hasta este punto.')
+          setErrorRuta(formatearMensajeError(err, 'No se pudo calcular la ruta hasta este punto.'))
           setRuta(null)
         } finally {
           setCargandoRuta(false)
@@ -645,6 +646,7 @@ const crearPunto = async (e) => {
     nombre: formulario.nombre,
     descripcion: formulario.descripcion,
     direccion: formulario.direccion,
+    localidad: 'Ciudad Bolívar',
     latitud: ubicacionSeleccionada[0],
     longitud: ubicacionSeleccionada[1],
     categorias: formulario.categorias
@@ -662,10 +664,10 @@ const crearPunto = async (e) => {
       body: JSON.stringify(datosEnviar)
     })
 
-    const datos = await respuesta.json()
+    const datos = await respuesta.json().catch(() => null)
 
     if (!respuesta.ok) {
-      setError(datos.detail || 'No se pudo crear el punto')
+      setError(formatearMensajeError(datos, 'No se pudo crear el punto'))
       return
     }
 
@@ -697,7 +699,7 @@ const crearPunto = async (e) => {
     }
   } catch (err) {
     console.error(err)
-    setError('No se pudo conectar con el servidor')
+    setError(formatearMensajeError(err, 'No se pudo conectar con el servidor'))
   } finally {
     setGuardando(false)
   }
@@ -780,11 +782,11 @@ const crearPunto = async (e) => {
         })
       })
 
-      const datos = await respuesta.json()
+      const datos = await respuesta.json().catch(() => null)
 
       if (!respuesta.ok) {
         setErrorReporte(
-          datos.detail || 'No se pudo registrar el reporte'
+          formatearMensajeError(datos, 'No se pudo registrar el reporte')
         )
         return
       }
@@ -795,7 +797,7 @@ const crearPunto = async (e) => {
       setMotivoReporte('')
     } catch (err) {
       console.error(err)
-      setErrorReporte('No se pudo conectar con el servidor')
+      setErrorReporte(formatearMensajeError(err, 'No se pudo conectar con el servidor'))
     } finally {
       setGuardandoReporte(false)
     }
@@ -913,10 +915,10 @@ const registrarEntrega = async (e) => {
       body: JSON.stringify(datosEnviar)
     })
 
-    const datos = await respuesta.json()
+    const datos = await respuesta.json().catch(() => null)
 
     if (!respuesta.ok) {
-      setErrorEntrega(datos.detail || 'No se pudo registrar la entrega')
+      setErrorEntrega(formatearMensajeError(datos, 'No se pudo registrar la entrega'))
       return
     }
 
@@ -933,7 +935,7 @@ const registrarEntrega = async (e) => {
     setObservacionEntrega('')
   } catch (err) {
     console.error(err)
-    setErrorEntrega('No se pudo conectar con el servidor')
+    setErrorEntrega(formatearMensajeError(err, 'No se pudo conectar con el servidor'))
   } finally {
     setGuardandoEntrega(false)
   }
