@@ -297,282 +297,350 @@ function Perfil() {
     <div className="perfil-page">
 
       {/* =====================================================
-          ENCABEZADO
+          A. ENCABEZADO DEL PERFIL (HERO)
       ===================================================== */}
       <div className="perfil-banner">
-        <div className="perfil-header">
+        {/* Glow & ambient background */}
+        <div className="perfil-glow-effect" aria-hidden="true"></div>
 
-          <div className="perfil-avatar">
-            {(usuario?.nombre || 'U').charAt(0).toUpperCase()}
+        <div className="perfil-banner-container">
+          <div className="perfil-header">
+
+            {/* Avatar con iniciales */}
+            <div className="perfil-avatar-wrapper">
+              <div className="perfil-avatar">
+                {(usuario?.nombre || 'U').charAt(0).toUpperCase()}
+              </div>
+              <span className="perfil-avatar-badge" title="Cuenta activa">
+                🌱
+              </span>
+            </div>
+
+            {/* Info principal */}
+            <div className="perfil-header-info">
+              <div className="perfil-header-top">
+                <span className="perfil-rol">
+                  {usuario?.es_admin ? '👑 Administrador' : '👤 Usuario'}
+                </span>
+                <span className="perfil-badge-status">
+                  <span className="perfil-status-dot"></span> Verificado
+                </span>
+              </div>
+
+              <h1>{usuario?.nombre || 'Usuario'}</h1>
+
+              <div className="perfil-header-meta">
+                <span className="perfil-email-meta">
+                  ✉️ {usuario?.correo || 'Sin correo'}
+                </span>
+                <span className="perfil-tagline">
+                  • Tu espacio personal en eco-TRACE
+                </span>
+              </div>
+            </div>
+
+            {/* Acciones principales del encabezado */}
+            <div className="perfil-header-actions">
+              {!editando ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMensaje('')
+                    setError('')
+                    setEditando(true)
+                  }}
+                  className="perfil-button perfil-button-primary"
+                >
+                  ✏️ Editar perfil
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={cancelarEdicion}
+                  className="perfil-button perfil-button-secondary"
+                >
+                  ✖️ Cancelar edición
+                </button>
+              )}
+            </div>
+
           </div>
-
-          <div className="perfil-header-info">
-            <h1>{usuario?.nombre || 'Usuario'}</h1>
-
-            <span className="perfil-rol">
-              {usuario?.es_admin ? '👑 Administrador' : '👤 Usuario'}
-            </span>
-          </div>
-
         </div>
       </div>
 
       {/* =====================================================
-          CONTENIDO
+          CONTENIDO PRINCIPAL
       ===================================================== */}
       <div className="perfil-body">
 
-        {/* MENSAJES */}
+        {/* MENSAJES DE ESTADO */}
         {mensaje && (
           <div className="perfil-message perfil-message-success">
-            <span>✅</span>
-            <span>{mensaje}</span>
+            <span className="perfil-message-icon">✅</span>
+            <div className="perfil-message-text">{mensaje}</div>
           </div>
         )}
 
         {error && usuario && (
           <div className="perfil-message perfil-message-error">
-            <span>⚠️</span>
-            <span>{error}</span>
+            <span className="perfil-message-icon">⚠️</span>
+            <div className="perfil-message-text">{error}</div>
           </div>
         )}
 
         {/* ===================================================
-            MODO NORMAL
+            B. PANEL DE INFORMACIÓN PERSONAL (MODO NORMAL)
         =================================================== */}
         {!editando && (
-          <>
-            <div className="perfil-info">
+          <section className="perfil-section">
+            <div className="perfil-section-header">
+              <span className="perfil-section-badge">Información</span>
+              <h2>Datos de tu cuenta</h2>
+              <p>Resumen general de la información asociada a tu perfil ecológico.</p>
+            </div>
 
-              <div className="perfil-item">
-                <span className="perfil-item-label">
-                  Nombre
-                </span>
+            <div className="perfil-info-grid">
 
-                <strong>
-                  {usuario?.nombre || 'No registrado'}
-                </strong>
+              <div className="perfil-card">
+                <div className="perfil-card-icon">👤</div>
+                <div className="perfil-card-content">
+                  <span className="perfil-item-label">Nombre de usuario</span>
+                  <strong>{usuario?.nombre || 'No registrado'}</strong>
+                </div>
               </div>
 
-              <div className="perfil-item">
-                <span className="perfil-item-label">
-                  Correo electrónico
-                </span>
-
-                <strong>
-                  {usuario?.correo || 'No registrado'}
-                </strong>
+              <div className="perfil-card">
+                <div className="perfil-card-icon">✉️</div>
+                <div className="perfil-card-content">
+                  <span className="perfil-item-label">Correo electrónico</span>
+                  <strong>{usuario?.correo || 'No registrado'}</strong>
+                </div>
               </div>
 
-              <div className="perfil-item">
-                <span className="perfil-item-label">
-                  Tipo de cuenta
-                </span>
-
-                <strong>
-                  {usuario?.es_admin
-                    ? 'Administrador'
-                    : 'Usuario'}
-                </strong>
+              <div className="perfil-card">
+                <div className="perfil-card-icon">🛡️</div>
+                <div className="perfil-card-content">
+                  <span className="perfil-item-label">Tipo de cuenta / Rol</span>
+                  <strong>
+                    {usuario?.es_admin ? 'Administrador del sistema' : 'Usuario comunitario'}
+                  </strong>
+                </div>
               </div>
 
             </div>
-
-            {/* BOTÓN EDITAR */}
-            <div className="perfil-actions">
-              <button
-                type="button"
-                onClick={() => {
-                  setMensaje('')
-                  setError('')
-                  setEditando(true)
-                }}
-                className="perfil-button perfil-button-primary"
-              >
-                ✏️ Editar perfil
-              </button>
-            </div>
-          </>
+          </section>
         )}
 
         {/* ===================================================
-            MODO EDICIÓN
+            FORMULARIO MODO EDICIÓN
         =================================================== */}
         {editando && (
-          <form
-            className="perfil-form"
-            onSubmit={guardarCambios}
-          >
-
-            <div className="perfil-section-heading">
-              <div>
-                <h2>Editar perfil</h2>
-                <p>
-                  Actualiza tus datos personales y,
-                  si quieres, cambia tu contraseña.
-                </p>
-              </div>
-            </div>
-
-            {/* NOMBRE */}
-            <div className="form-group">
-              <label htmlFor="perfil-nombre">
-                Nombre
-              </label>
-
-              <input
-                id="perfil-nombre"
-                type="text"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                placeholder="Tu nombre"
-              />
-            </div>
-
-            {/* CORREO */}
-            <div className="form-group">
-              <label htmlFor="perfil-correo">
-                Correo electrónico
-              </label>
-
-              <input
-                id="perfil-correo"
-                type="email"
-                value={correo}
-                onChange={(e) => setCorreo(e.target.value)}
-                placeholder="Tu correo electrónico"
-              />
-            </div>
-
-            {/* =================================================
-                CAMBIO DE CONTRASEÑA
-            ================================================= */}
-            <div className="perfil-security-card">
+          <section className="perfil-section">
+            <form
+              className="perfil-form"
+              onSubmit={guardarCambios}
+            >
 
               <div className="perfil-section-heading">
                 <div>
-                  <h2>🔐 Cambiar contraseña</h2>
+                  <span className="perfil-section-badge">Edición</span>
+                  <h2>Editar información general</h2>
                   <p>
-                    Déjalos vacíos si no deseas cambiar
-                    tu contraseña.
+                    Actualiza tu nombre o correo electrónico. Los cambios se reflejarán en toda la plataforma.
                   </p>
                 </div>
               </div>
 
-              <div className="perfil-password-options">
-
+              <div className="perfil-form-grid">
+                {/* NOMBRE */}
                 <div className="form-group">
-                  <label htmlFor="password-actual">
-                    Contraseña actual
+                  <label htmlFor="perfil-nombre">
+                    Nombre completo
                   </label>
-
                   <input
-                    id="password-actual"
-                    type="password"
-                    value={passwordActual}
-                    onChange={(e) =>
-                      setPasswordActual(e.target.value)
-                    }
-                    placeholder="Tu contraseña actual"
+                    id="perfil-nombre"
+                    type="text"
+                    value={nombre}
+                    onChange={(e) => setNombre(e.target.value)}
+                    placeholder="Tu nombre"
+                    required
                   />
                 </div>
 
+                {/* CORREO */}
                 <div className="form-group">
-                  <label htmlFor="nueva-password">
-                    Nueva contraseña
+                  <label htmlFor="perfil-correo">
+                    Correo electrónico
                   </label>
-
                   <input
-                    id="nueva-password"
-                    type="password"
-                    value={nuevaPassword}
-                    onChange={(e) =>
-                      setNuevaPassword(e.target.value)
-                    }
-                    placeholder="Mínimo 8 caracteres"
+                    id="perfil-correo"
+                    type="email"
+                    value={correo}
+                    onChange={(e) => setCorreo(e.target.value)}
+                    placeholder="Tu correo electrónico"
+                    required
                   />
                 </div>
-
-                <div className="form-group">
-                  <label htmlFor="confirmar-password">
-                    Confirmar nueva contraseña
-                  </label>
-
-                  <input
-                    id="confirmar-password"
-                    type="password"
-                    value={confirmarPassword}
-                    onChange={(e) =>
-                      setConfirmarPassword(e.target.value)
-                    }
-                    placeholder="Repite la nueva contraseña"
-                  />
-                </div>
-
               </div>
-            </div>
 
-            {/* BOTONES */}
-            <div className="perfil-actions">
+              {/* =================================================
+                  D. SECCIÓN ADICIONAL DE SEGURIDAD
+              ================================================= */}
+              <div className="perfil-security-card">
+                <div className="perfil-section-heading">
+                  <div>
+                    <h2>🔐 Seguridad y contraseña</h2>
+                    <p>
+                      Completa los siguientes campos solo si deseas cambiar tu contraseña de acceso.
+                    </p>
+                  </div>
+                </div>
 
-              <button
-                type="submit"
-                disabled={guardando}
-                className="perfil-button perfil-button-primary"
-              >
-                {guardando
-                  ? 'Guardando...'
-                  : '💾 Guardar cambios'}
-              </button>
+                <div className="perfil-password-options">
 
-              <button
-                type="button"
-                onClick={cancelarEdicion}
-                disabled={guardando}
-                className="perfil-button perfil-button-secondary"
-              >
-                Cancelar
-              </button>
+                  <div className="form-group">
+                    <label htmlFor="password-actual">
+                      Contraseña actual
+                    </label>
+                    <input
+                      id="password-actual"
+                      type="password"
+                      value={passwordActual}
+                      onChange={(e) => setPasswordActual(e.target.value)}
+                      placeholder="Tu contraseña actual"
+                    />
+                  </div>
 
-            </div>
+                  <div className="form-group">
+                    <label htmlFor="nueva-password">
+                      Nueva contraseña
+                    </label>
+                    <input
+                      id="nueva-password"
+                      type="password"
+                      value={nuevaPassword}
+                      onChange={(e) => setNuevaPassword(e.target.value)}
+                      placeholder="Mínimo 8 caracteres"
+                    />
+                  </div>
 
-          </form>
+                  <div className="form-group">
+                    <label htmlFor="confirmar-password">
+                      Confirmar nueva contraseña
+                    </label>
+                    <input
+                      id="confirmar-password"
+                      type="password"
+                      value={confirmarPassword}
+                      onChange={(e) => setConfirmarPassword(e.target.value)}
+                      placeholder="Repite la nueva contraseña"
+                    />
+                  </div>
+
+                </div>
+              </div>
+
+              {/* BOTONES DE ACCIÓN */}
+              <div className="perfil-actions">
+                <button
+                  type="submit"
+                  disabled={guardando}
+                  className="perfil-button perfil-button-primary"
+                >
+                  {guardando ? 'Guardando...' : '💾 Guardar cambios'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={cancelarEdicion}
+                  disabled={guardando}
+                  className="perfil-button perfil-button-secondary"
+                >
+                  Cancelar
+                </button>
+              </div>
+
+            </form>
+          </section>
         )}
 
         {/* =====================================================
-            ACCIONES RÁPIDAS
+            C. SECCIÓN DE ACCIONES RÁPIDAS
         ===================================================== */}
-        <div className="perfil-shortcuts">
+        <section className="perfil-section perfil-shortcuts-section">
+          <div className="perfil-section-header">
+            <span className="perfil-section-badge">Accesos directos</span>
+            <h2>Acciones rápidas</h2>
+            <p>Navega rápidamente a las principales áreas funcionales de eco-TRACE.</p>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => navigate('/mis-puntos')}
-            className="perfil-shortcut"
-          >
-            <span>📍</span>
-            <div>
-              <strong>Mis puntos</strong>
-              <small>
-                Consulta los puntos que has propuesto
-              </small>
-            </div>
-          </button>
+          <div className="perfil-shortcuts">
 
-          <button
-            type="button"
-            onClick={() => navigate('/mapa')}
-            className="perfil-shortcut"
-          >
-            <span>🗺️</span>
-            <div>
-              <strong>Ver mapa</strong>
-              <small>
-                Explora los puntos ecológicos
-              </small>
-            </div>
-          </button>
+            {/* Mis puntos */}
+            <button
+              type="button"
+              onClick={() => navigate('/mis-puntos')}
+              className="perfil-shortcut"
+            >
+              <span className="perfil-shortcut-icon">📍</span>
+              <div className="perfil-shortcut-text">
+                <strong>Mis puntos ecológicos</strong>
+                <small>Consulta y gestiona los puntos que has propuesto</small>
+              </div>
+              <span className="perfil-shortcut-arrow">→</span>
+            </button>
 
-        </div>
+            {/* Explorar mapa */}
+            <button
+              type="button"
+              onClick={() => navigate('/mapa')}
+              className="perfil-shortcut"
+            >
+              <span className="perfil-shortcut-icon">🗺️</span>
+              <div className="perfil-shortcut-text">
+                <strong>Explorar el mapa</strong>
+                <small>Encuentra lugares de reciclaje en tu ciudad</small>
+              </div>
+              <span className="perfil-shortcut-arrow">→</span>
+            </button>
+
+            {/* Editar Perfil Toggle */}
+            <button
+              type="button"
+              onClick={() => {
+                setMensaje('')
+                setError('')
+                setEditando(!editando)
+                window.scrollTo({ top: 0, behavior: 'smooth' })
+              }}
+              className="perfil-shortcut"
+            >
+              <span className="perfil-shortcut-icon">✏️</span>
+              <div className="perfil-shortcut-text">
+                <strong>Editar mi perfil</strong>
+                <small>Modifica tus datos o cambia tu contraseña</small>
+              </div>
+              <span className="perfil-shortcut-arrow">→</span>
+            </button>
+
+            {/* Panel de administración (solo para administradores) */}
+            {usuario?.es_admin && (
+              <button
+                type="button"
+                onClick={() => navigate('/admin')}
+                className="perfil-shortcut perfil-shortcut-admin"
+              >
+                <span className="perfil-shortcut-icon">🛡️</span>
+                <div className="perfil-shortcut-text">
+                  <strong>Panel de administración</strong>
+                  <small>Modera solicitudes y gestiona la plataforma</small>
+                </div>
+                <span className="perfil-shortcut-arrow">→</span>
+              </button>
+            )}
+
+          </div>
+        </section>
 
       </div>
     </div>
@@ -580,4 +648,3 @@ function Perfil() {
 }
 
 export default Perfil
-
