@@ -20,7 +20,8 @@ import 'leaflet/dist/leaflet.css'
 import {
   normalizarPunto,
   CATEGORIAS_DISPONIBLES,
-  obtenerIconoYColorPorCategorias
+  obtenerIconoYColorPorCategorias,
+  formatearMensajeError
 } from '../utils/puntoUtils'
 import { CategoriasBadges } from '../components/CategoriasBadges'
 
@@ -228,6 +229,7 @@ function Mapa() {
     nombre: '',
     descripcion: '',
     direccion: '',
+    localidad: 'Ciudad Bolívar',
     categorias: []
   })
 
@@ -590,6 +592,7 @@ function Mapa() {
       nombre: '',
       descripcion: '',
       direccion: '',
+      localidad: 'Ciudad Bolívar',
       categorias: []
     })
     setMensaje('')
@@ -612,6 +615,8 @@ function Mapa() {
 const crearPunto = async (e) => {
   e.preventDefault()
 
+  if (guardando) return
+
   setError('')
   setMensaje('')
 
@@ -623,7 +628,8 @@ const crearPunto = async (e) => {
   if (
     !formulario.nombre ||
     !formulario.descripcion ||
-    !formulario.direccion
+    !formulario.direccion ||
+    !formulario.localidad
   ) {
     setError('Todos los campos son obligatorios')
     return
@@ -642,9 +648,10 @@ const crearPunto = async (e) => {
   }
 
   const datosEnviar = {
-    nombre: formulario.nombre,
-    descripcion: formulario.descripcion,
-    direccion: formulario.direccion,
+    nombre: formulario.nombre.trim(),
+    descripcion: formulario.descripcion.trim(),
+    direccion: formulario.direccion.trim(),
+    localidad: (formulario.localidad || 'Ciudad Bolívar').trim(),
     latitud: ubicacionSeleccionada[0],
     longitud: ubicacionSeleccionada[1],
     categorias: formulario.categorias
@@ -665,7 +672,7 @@ const crearPunto = async (e) => {
     const datos = await respuesta.json()
 
     if (!respuesta.ok) {
-      setError(datos.detail || 'No se pudo crear el punto')
+      setError(formatearMensajeError(datos?.detail, 'No se pudo crear el punto'))
       return
     }
 
@@ -675,6 +682,7 @@ const crearPunto = async (e) => {
       nombre: '',
       descripcion: '',
       direccion: '',
+      localidad: 'Ciudad Bolívar',
       categorias: []
     })
 
@@ -784,7 +792,7 @@ const crearPunto = async (e) => {
 
       if (!respuesta.ok) {
         setErrorReporte(
-          datos.detail || 'No se pudo registrar el reporte'
+          formatearMensajeError(datos?.detail, 'No se pudo registrar el reporte')
         )
         return
       }
@@ -916,7 +924,9 @@ const registrarEntrega = async (e) => {
     const datos = await respuesta.json()
 
     if (!respuesta.ok) {
-      setErrorEntrega(datos.detail || 'No se pudo registrar la entrega')
+      setErrorEntrega(
+        formatearMensajeError(datos?.detail, 'No se pudo registrar la entrega')
+      )
       return
     }
 
@@ -1131,7 +1141,7 @@ const registrarEntrega = async (e) => {
               </h2>
 
               <form onSubmit={crearPunto} className="space-y-5">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 dark:text-[#f2f5f3] uppercase tracking-wider mb-2">
                       Nombre del punto
@@ -1155,6 +1165,20 @@ const registrarEntrega = async (e) => {
                       name="direccion"
                       placeholder="Ej: Carrera 50 # 20-30"
                       value={formulario.direccion}
+                      onChange={manejarCambioFormulario}
+                      className="w-full px-4 py-2.5 text-xs rounded-xl bg-gray-50 dark:bg-[#0f1512] text-gray-900 dark:text-white border border-gray-200 dark:border-gray-800 focus:outline-hidden focus:border-[#218739] dark:focus:border-[#2fa350] transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-[#f2f5f3] uppercase tracking-wider mb-2">
+                      Localidad
+                    </label>
+                    <input
+                      type="text"
+                      name="localidad"
+                      placeholder="Ej: Ciudad Bolívar"
+                      value={formulario.localidad}
                       onChange={manejarCambioFormulario}
                       className="w-full px-4 py-2.5 text-xs rounded-xl bg-gray-50 dark:bg-[#0f1512] text-gray-900 dark:text-white border border-gray-200 dark:border-gray-800 focus:outline-hidden focus:border-[#218739] dark:focus:border-[#2fa350] transition-all"
                     />
@@ -1219,7 +1243,7 @@ const registrarEntrega = async (e) => {
 
                 {error && (
                   <div className="p-3.5 bg-red-50 dark:bg-red-950/20 text-[#d93025] dark:text-[#ef5350] border border-red-100 dark:border-red-900/30 rounded-xl text-xs font-bold">
-                    ⚠️ {error}
+                    ⚠️ {typeof error === 'string' ? error : formatearMensajeError(error)}
                   </div>
                 )}
 

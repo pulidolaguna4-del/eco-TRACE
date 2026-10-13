@@ -69,3 +69,47 @@ export function obtenerIconoYColorPorCategorias(categorias = []) {
 
   return { emoji: '📍', color: '#218739' }
 }
+
+/**
+ * Convierte respuestas de error de la API (como los arreglos/objetos detail de FastAPI/Pydantic)
+ * en un mensaje de texto plano, amigable y legible para el usuario.
+ */
+export function formatearMensajeError(detail, fallback = 'Ocurrió un error inesperado') {
+  if (!detail) return fallback
+  if (typeof detail === 'string') return detail
+
+  if (Array.isArray(detail)) {
+    const mensajes = detail.map((item) => {
+      if (typeof item === 'string') return item
+      if (typeof item === 'object' && item !== null) {
+        const campo = Array.isArray(item.loc)
+          ? item.loc[item.loc.length - 1]
+          : ''
+        const msg = item.msg || 'error de validación'
+        if (
+          msg.toLowerCase().includes('field required') ||
+          msg.toLowerCase().includes('field_required')
+        ) {
+          return campo
+            ? `El campo '${campo}' es obligatorio.`
+            : 'Un campo obligatorio no fue proporcionado.'
+        }
+        return campo ? `El campo '${campo}': ${msg}` : msg
+      }
+      return String(item)
+    })
+    return mensajes.join(' ')
+  }
+
+  if (typeof detail === 'object' && detail !== null) {
+    if (detail.msg) return detail.msg
+    if (detail.message) return detail.message
+    try {
+      return JSON.stringify(detail)
+    } catch {
+      return fallback
+    }
+  }
+
+  return String(detail)
+}
