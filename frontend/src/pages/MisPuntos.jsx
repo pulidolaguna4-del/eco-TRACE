@@ -320,6 +320,11 @@ function MisPuntos() {
                     <p className="text-xs text-gray-500 dark:text-[#a8b3ae] line-clamp-2">
                       {punto.descripcion}
                     </p>
+                    {punto.estado === 'rechazado' && punto.motivo_rechazo && (
+                      <p className="text-xs text-[#d93025] dark:text-[#ef5350] bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-lg px-3 py-2">
+                        <strong>Motivo del rechazo:</strong> {punto.motivo_rechazo}
+                      </p>
+                    )}
                     <div className="text-[11px] text-gray-400 font-medium flex items-center gap-4 flex-wrap pt-1">
                       <span>📍 <strong>Dirección:</strong> {punto.direccion}</span>
                       <span>🏙️ <strong>Localidad:</strong> {punto.localidad}</span>

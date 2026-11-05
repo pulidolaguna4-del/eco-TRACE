@@ -4,12 +4,13 @@
 // Mantienen exactamente la forma de las respuestas del backend
 // anterior (response_model de FastAPI) para no romper el frontend.
 
-// Las columnas son "timestamp without time zone" y guardan la hora UTC.
-// FastAPI las devolvía sin zona ("2026-11-05T14:35:24.518000"), así que
-// se quita la "Z" para que el frontend las interprete igual que antes.
+// Las columnas son "timestamp without time zone" y Prisma siempre guarda
+// en ellas la hora UTC. Se devuelven en ISO 8601 con "Z" para que el
+// navegador las convierta a la hora local (Bogotá, UTC-5) al mostrarlas.
+// FastAPI las devolvía sin zona y el frontend mostraba la hora UTC.
 export function fecha(valor) {
   if (!valor) return valor
-  return valor.toISOString().replace('Z', '')
+  return valor.toISOString()
 }
 
 export function usuario(u) {

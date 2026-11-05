@@ -224,6 +224,181 @@ function LoadingButton({
 }
 
 // =========================================================
+// MODAL DE RECHAZO (PIDE EL MOTIVO)
+// =========================================================
+
+const MOTIVO_RECHAZO_MIN = 5
+const MOTIVO_RECHAZO_MAX = 500
+
+function ModalRechazo({
+  punto,
+  procesando,
+  onCancelar,
+  onConfirmar
+}) {
+  const [motivo, setMotivo] = useState('')
+  const [errorMotivo, setErrorMotivo] = useState('')
+
+  const confirmar = (evento) => {
+    evento.preventDefault()
+
+    const motivoLimpio = motivo.trim()
+
+    if (motivoLimpio.length < MOTIVO_RECHAZO_MIN) {
+      setErrorMotivo(
+        `Explica el motivo con al menos ${MOTIVO_RECHAZO_MIN} caracteres`
+      )
+      return
+    }
+
+    onConfirmar(motivoLimpio)
+  }
+
+  // Cerrar con Escape
+  useEffect(() => {
+    const alPresionarTecla = (evento) => {
+      if (evento.key === 'Escape' && !procesando) onCancelar()
+    }
+    window.addEventListener('keydown', alPresionarTecla)
+    return () => window.removeEventListener('keydown', alPresionarTecla)
+  }, [procesando, onCancelar])
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-0 z-[2000] bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="titulo-modal-rechazo"
+      onClick={() => !procesando && onCancelar()}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 15 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 15 }}
+        transition={{ duration: 0.2 }}
+        className="w-full max-w-md bg-white dark:bg-[#1a2320] rounded-3xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+
+        {/* ENCABEZADO */}
+        <div className="relative px-6 pt-6 pb-4 border-b border-gray-100 dark:border-gray-700">
+
+          <button
+            type="button"
+            onClick={onCancelar}
+            disabled={procesando}
+            className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition disabled:opacity-50"
+            aria-label="Cerrar"
+          >
+            ✕
+          </button>
+
+          <div className="flex items-center gap-3 pr-10">
+            <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-2xl">
+              ✕
+            </div>
+
+            <div>
+              <h2
+                id="titulo-modal-rechazo"
+                className="text-xl font-extrabold text-gray-900 dark:text-white"
+              >
+                Rechazar punto
+              </h2>
+
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                El motivo se le enviará al usuario que propuso el punto.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* CONTENIDO */}
+        <form onSubmit={confirmar} className="px-6 py-5 space-y-5">
+
+          <div className="rounded-2xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/40 p-4">
+            <p className="text-[11px] uppercase tracking-wide font-bold text-red-700 dark:text-red-400 mb-1">
+              Punto seleccionado
+            </p>
+
+            <p className="text-base font-extrabold text-gray-900 dark:text-white">
+              {punto.nombre}
+            </p>
+
+            {punto.direccion && (
+              <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                📍 {punto.direccion}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label
+              htmlFor="motivo-rechazo"
+              className="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2"
+            >
+              Motivo del rechazo *
+            </label>
+
+            <textarea
+              id="motivo-rechazo"
+              value={motivo}
+              onChange={(e) => {
+                setMotivo(e.target.value)
+                setErrorMotivo('')
+              }}
+              maxLength={MOTIVO_RECHAZO_MAX}
+              rows={4}
+              autoFocus
+              disabled={procesando}
+              placeholder="Ej.: la ubicación no corresponde a la dirección indicada..."
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition resize-none"
+            />
+
+            <div className="flex justify-between items-center mt-1.5">
+              <p className={`text-[11px] ${errorMotivo ? 'text-red-500 font-bold' : 'text-gray-500 dark:text-gray-400'}`}>
+                {errorMotivo || 'Indica qué debe corregir el usuario.'}
+              </p>
+
+              <p className="text-[10px] font-bold text-gray-400">
+                {motivo.length}/{MOTIVO_RECHAZO_MAX}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onCancelar}
+              disabled={procesando}
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-[#f2f5f3] transition disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="submit"
+              disabled={procesando}
+              className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#d93025] to-[#f44336] hover:from-[#b3261e] hover:to-[#d32f2f] transition disabled:opacity-50 flex items-center gap-1.5"
+            >
+              {procesando && (
+                <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              )}
+              {procesando ? 'Rechazando...' : 'Rechazar punto'}
+            </button>
+          </div>
+
+        </form>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+// =========================================================
 // ADMIN
 // =========================================================
 
@@ -264,6 +439,10 @@ function Admin() {
     useState('')
 
   const [procesandoId, setProcesandoId] =
+    useState(null)
+
+  // Punto que se está rechazando (abre el modal del motivo)
+  const [puntoARechazar, setPuntoARechazar] =
     useState(null)
 
   const [usuarioProcesandoId, setUsuarioProcesandoId] =
@@ -620,9 +799,11 @@ function Admin() {
   // APROBAR / RECHAZAR PUNTO
   // =========================================================
 
+  // Devuelve true si el cambio se guardó correctamente
   const cambiarEstado = async (
     puntoId,
-    accion
+    accion,
+    motivoRechazo = null
   ) => {
 
     const token =
@@ -647,8 +828,14 @@ function Admin() {
           {
             method: 'PUT',
             headers: {
-              Authorization: `Bearer ${token}`
-            }
+              Authorization: `Bearer ${token}`,
+              ...(motivoRechazo
+                ? { 'Content-Type': 'application/json' }
+                : {})
+            },
+            ...(motivoRechazo
+              ? { body: JSON.stringify({ motivo_rechazo: motivoRechazo }) }
+              : {})
           }
         )
 
@@ -755,6 +942,8 @@ function Admin() {
           )
       )
 
+      return true
+
     } catch (err) {
 
       console.error(
@@ -767,8 +956,28 @@ function Admin() {
         'No se pudo procesar el punto'
       )
 
+      return false
+
     } finally {
       setProcesandoId(null)
+    }
+  }
+
+  // =========================================================
+  // RECHAZAR PUNTO CON MOTIVO (desde el modal)
+  // =========================================================
+
+  const confirmarRechazo = async (motivo) => {
+    if (!puntoARechazar) return
+
+    const guardado = await cambiarEstado(
+      puntoARechazar.id,
+      'rechazar',
+      motivo
+    )
+
+    if (guardado) {
+      setPuntoARechazar(null)
     }
   }
 
@@ -2683,6 +2892,7 @@ function Admin() {
                       `Punto #${reporte.punto_id ?? '—'}`
 
                     const nombreReportante =
+                      reporte.nombre_usuario ||
                       reporte.usuario_nombre ||
                       reporte.reportante_nombre ||
                       reporte.reportante?.nombre ||
@@ -2690,6 +2900,7 @@ function Admin() {
                       `Usuario #${reporte.usuario_id ?? '—'}`
 
                     const correoReportante =
+                      reporte.correo_usuario ||
                       reporte.usuario_correo ||
                       reporte.reportante_correo ||
                       reporte.reportante?.correo ||
@@ -3128,9 +3339,8 @@ function Admin() {
                                     texto="Rechazar"
                                     variante="peligro"
                                     onClick={() =>
-                                      cambiarEstado(
-                                        punto.id,
-                                        'rechazar'
+                                      setPuntoARechazar(
+                                        punto
                                       )
                                     }
                                     deshabilitado={
@@ -3252,6 +3462,20 @@ function Admin() {
         )}
 
       </main>
+
+      {/* MODAL PARA RECHAZAR UN PUNTO CON MOTIVO */}
+
+      <AnimatePresence>
+        {puntoARechazar && (
+          <ModalRechazo
+            key={puntoARechazar.id}
+            punto={puntoARechazar}
+            procesando={procesandoId === puntoARechazar.id}
+            onCancelar={() => setPuntoARechazar(null)}
+            onConfirmar={confirmarRechazo}
+          />
+        )}
+      </AnimatePresence>
 
     </div>
   )

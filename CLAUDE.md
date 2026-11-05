@@ -18,9 +18,11 @@ Roles: `usuario` y `admin` (columna `es_admin`). Un cambio de rol solo se reflej
 ## Stack
 - **Frontend** (`frontend/`): React 19, Vite, Tailwind 4, React Router 7, Framer Motion, Leaflet / React-Leaflet, Turf.
   - Páginas en `src/pages`: Home, Login, Register, RecuperarPassword, Mapa, Perfil, MisPuntos, Historial, Admin.
-- **Backend** (`backend/`): **en migración de FastAPI/SQLModel a Express 5 + Prisma 6 + Zod + argon2** (rama `feat/backend-express`).
-  - El backend FastAPI original (`backend/app/main.py`, unos 27 endpoints) sigue en `main` como referencia.
-  - El esquema Prisma (`backend/prisma/schema.prisma`) replica exactamente las tablas que creaba FastAPI, para no romper la base existente.
+- **Backend** (`backend/`): **Express 5 + Prisma 6 + Zod + argon2**, en JavaScript (ESM). Reemplazó al backend FastAPI/SQLModel (PR #42, 2026-11-05); el código Python solo queda en el historial de git.
+  - Organizado por capas en `src/`: `routes/` → `controllers/` → `services/` (lógica y Prisma), más `middlewares/` (JWT, admin, validación, errores), `validators/` (Zod) y `utils/` (JWT, argon2, serializadores).
+  - Los 27 endpoints conservan las rutas y el formato de respuesta del backend FastAPI. Los errores responden `{ detail }`, y los de validación `422` con `detail: [{ loc, msg }]`, como Pydantic.
+  - El esquema Prisma (`backend/prisma/schema.prisma`) replica las tablas que creaba FastAPI. Migraciones: `0_init` (baseline) y `1_ajustes_express`; `scripts/migrate.js` las aplica al arrancar el contenedor.
+  - Las fechas se guardan en UTC y la API las devuelve en ISO 8601 con `Z`; el frontend las muestra en la hora local del navegador.
 - **Base de datos**: PostgreSQL 17. Tablas: `usuarios`, `puntos`, `categorias`, `punto_categoria` (un punto tiene varias categorías), `entregas`, `reportes` y `codigos_recuperacion`.
 - **Infraestructura**: `docker compose up --build` levanta db (5432), backend (8000) y frontend (5173). Las variables van en `.env` en la raíz (ignorado por git): `POSTGRES_*`, `SECRET_KEY`, `EMAIL_*`.
 
@@ -46,8 +48,7 @@ El MER y el diagrama de clases de `docs/requisitos` describen un modelo más com
 - `entregas` usa `tipo`, `cantidad` y `unidad`. El MER pide `nombreArticulo`, `peso`, `estadoConservacion`, `fotoUrl` e `idCategoria`.
 - Los correos se envían por SMTP (Gmail/nodemailer). Los documentos hablan de Resend.
 - No hay un dashboard de impacto (HU-22).
-- El `README.md` todavía describe el backend FastAPI.
-- Pendiente del README: migraciones incrementales y optimización del módulo de historial e impacto.
+- Pendiente del README: optimización del módulo de historial e impacto.
 
 ## Convenciones
 - Todo el código, los nombres de tablas y campos y los textos de la interfaz van en **español** (`usuario_id`, `fecha_creacion`, `motivo_rechazo`...).
