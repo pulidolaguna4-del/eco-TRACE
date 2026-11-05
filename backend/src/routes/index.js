@@ -1,0 +1,21 @@
+import { Router } from 'express'
+
+import * as sistema from '../controllers/sistema.controller.js'
+import adminRoutes from './admin.routes.js'
+import entregasRoutes from './entregas.routes.js'
+import puntosRoutes from './puntos.routes.js'
+import reportesRoutes from './reportes.routes.js'
+import usuariosRoutes from './usuarios.routes.js'
+
+const router = Router()
+
+router.get('/', sistema.inicio)
+router.get('/db', sistema.comprobarBaseDatos)
+
+router.use('/usuarios', usuariosRoutes)
+router.use('/puntos', puntosRoutes)
+router.use('/entregas', entregasRoutes)
+router.use('/reportes', reportesRoutes)
+router.use('/admin', adminRoutes)
+
+export default router

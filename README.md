@@ -4,7 +4,7 @@ Plataforma web que centraliza y verifica puntos ecológicos (reciclaje, donació
 
 ## 🚀 Despliegue con Docker (Recomendado)
 
-Con un solo comando puedes levantar la base de datos (PostgreSQL), el backend (FastAPI) y el frontend (React + Vite) listos para desarrollo:
+Con un solo comando puedes levantar la base de datos (PostgreSQL), el backend (Express + Prisma) y el frontend (React + Vite) listos para desarrollo:
 
 ```bash
 docker compose up --build
@@ -12,8 +12,22 @@ docker compose up --build
 
 - **Frontend**: http://localhost:5173
 - **Backend API**: http://localhost:8000
-- **Documentación Swagger API**: http://localhost:8000/docs
 - **Base de datos Postgres**: localhost:5432 (`eco_trace_db`)
+
+Antes del primer arranque crea un archivo `.env` en la raíz con:
+
+```env
+POSTGRES_USER=eco_trace
+POSTGRES_PASSWORD=eco_trace_password
+POSTGRES_DB=eco_trace
+SECRET_KEY=una_clave_larga_y_aleatoria
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=tu_correo@gmail.com
+EMAIL_PASSWORD=tu_contraseña_de_aplicacion
+```
+
+Al iniciar, el backend aplica automáticamente las migraciones de Prisma pendientes.
 
 ### 🔄 Recrear la base de datos desde cero (Aplicar cambios de esquema)
 
@@ -33,13 +47,45 @@ Si prefieres levantar el backend y frontend manualmente de forma independiente:
 ### 1. Base de datos (PostgreSQL)
 Asegúrate de tener un servidor PostgreSQL corriendo en `localhost:5432` con usuario `eco_trace`, contraseña `eco_trace_password` y base de datos `eco_trace`, o define la variable de entorno `DATABASE_URL`.
 
-### 2. Backend (FastAPI)
+### 2. Backend (Express + Prisma)
+Requiere Node.js 20 o superior. Crea `backend/.env` con `DATABASE_URL`, `SECRET_KEY`, `EMAIL_USER` y `EMAIL_PASSWORD`, por ejemplo:
+
+```env
+DATABASE_URL=postgresql://eco_trace:eco_trace_password@localhost:5432/eco_trace
+```
+
 ```bash
 cd backend
-python -m venv venv
-source venv/bin/activate  # En Windows: venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+npm install
+npm run db:migrate   # aplica las migraciones de Prisma
+npm run dev          # http://localhost:8000 (se reinicia al guardar)
+```
+
+#### Estructura del backend
+
+```
+backend/
+├── prisma/
+│   ├── schema.prisma     # modelos de la base de datos
+│   └── migrations/       # migraciones (0_init = esquema heredado de FastAPI)
+├── scripts/migrate.js    # aplica migraciones (y hace baseline en bases existentes)
+└── src/
+    ├── server.js         # arranque del servidor
+    ├── app.js            # aplicación Express (CORS, JSON, rutas, errores)
+    ├── config/           # variables de entorno y cliente de Prisma
+    ├── routes/           # definición de endpoints
+    ├── controllers/      # leen la petición y dan forma a la respuesta
+    ├── services/         # lógica de negocio y acceso a datos
+    ├── middlewares/      # autenticación JWT, permisos de admin, validación, errores
+    ├── validators/       # esquemas de validación (Zod)
+    └── utils/            # JWT, hash de contraseñas, serializadores
+```
+
+#### Cambiar el esquema de la base de datos
+
+```bash
+cd backend
+npx prisma migrate dev --name descripcion_del_cambio
 ```
 
 ### 3. Frontend (React + Vite)
@@ -73,5 +119,4 @@ docker exec -it eco_trace_db psql -U eco_trace -d eco_trace -c "UPDATE usuarios 
 
 ## 🔜 Pendiente
 
-- Migraciones incrementales con Alembic
 - Mantenimiento y optimización del módulo de historial e impacto

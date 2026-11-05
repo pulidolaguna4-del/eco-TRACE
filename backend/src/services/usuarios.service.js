@@ -1,0 +1,108 @@
+// =========================================================
+// SERVICIO DE USUARIOS
+// =========================================================
+
+import { prisma } from '../config/prisma.js'
+import { HttpError } from '../utils/HttpError.js'
+import { hashPassword, verificarPassword } from '../utils/password.js'
+
+export function listar() {
+  return prisma.usuario.findMany({ orderBy: { id: 'asc' } })
+}
+
+export async function actualizarPerfil(usuarioId, { nombre, correo }) {
+  const correoEnUso = await prisma.usuario.findFirst({
+    where: { correo, id: { not: usuarioId } }
+  })
+
+  if (correoEnUso) {
+    throw new HttpError(400, 'El correo ya está registrado por otro usuario')
+  }
+
+  return prisma.usuario.update({
+    where: { id: usuarioId },
+    data: { nombre, correo }
+  })
+}
+
+export async function cambiarContrasena(usuario, { password_actual, nueva_password }) {
+  if (nueva_password.trim().length < 8) {
+    throw new HttpError(400, 'La nueva contraseña debe tener al menos 8 caracteres')
+  }
+
+  if (password_actual === nueva_password) {
+    throw new HttpError(400, 'La nueva contraseña debe ser diferente a la actual')
+  }
+
+  if (!(await verificarPassword(password_actual, usuario.password))) {
+    throw new HttpError(400, 'La contraseña actual es incorrecta')
+  }
+
+  await prisma.usuario.update({
+    where: { id: usuario.id },
+    data: { password: await hashPassword(nueva_password) }
+  })
+
+  return { mensaje: 'Contraseña actualizada correctamente' }
+}
+
+// ---------------------------------------------------------
+// Administración
+// ---------------------------------------------------------
+
+async function obtenerOtroUsuario(usuarioId, adminId, mensajePropio) {
+  const usuario = await prisma.usuario.findUnique({ where: { id: usuarioId } })
+  if (!usuario) throw new HttpError(404, 'Usuario no encontrado')
+  if (usuario.id === adminId) throw new HttpError(400, mensajePropio)
+  return usuario
+}
+
+// Convierte / quita permisos de administrador
+export async function alternarAdmin(usuarioId, adminId) {
+  const usuario = await obtenerOtroUsuario(
+    usuarioId,
+    adminId,
+    'No puedes cambiar tus propios permisos de administrador'
+  )
+
+  return prisma.usuario.update({
+    where: { id: usuario.id },
+    data: { es_admin: !usuario.es_admin }
+  })
+}
+
+// Elimina el usuario junto con sus puntos, entregas, reportes y códigos
+export async function eliminarConDatos(usuarioId, adminId) {
+  const usuario = await obtenerOtroUsuario(
+    usuarioId,
+    adminId,
+    'No puedes eliminar tu propia cuenta desde el panel de administración'
+  )
+
+  const puntos = await prisma.punto.findMany({
+    where: { usuario_id: usuario.id },
+    select: { id: true }
+  })
+  const puntosIds = puntos.map((p) => p.id)
+
+  // Lo creado por el usuario o asociado a sus puntos
+  const delUsuarioOSusPuntos = {
+    OR: [{ usuario_id: usuario.id }, { punto_id: { in: puntosIds } }]
+  }
+
+  try {
+    await prisma.$transaction([
+      prisma.reporte.deleteMany({ where: delUsuarioOSusPuntos }),
+      prisma.entrega.deleteMany({ where: delUsuarioOSusPuntos }),
+      prisma.puntoCategoria.deleteMany({ where: { punto_id: { in: puntosIds } } }),
+      prisma.punto.deleteMany({ where: { id: { in: puntosIds } } }),
+      prisma.codigoRecuperacion.deleteMany({ where: { usuario_id: usuario.id } }),
+      prisma.usuario.delete({ where: { id: usuario.id } })
+    ])
+  } catch (error) {
+    console.error('ERROR AL ELIMINAR USUARIO:', error)
+    throw new HttpError(500, 'No se pudo eliminar el usuario y sus datos relacionados')
+  }
+
+  return { mensaje: 'Usuario y sus datos relacionados eliminados correctamente' }
+}

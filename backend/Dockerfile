@@ -1,21 +1,23 @@
-FROM python:3.12-slim
+FROM node:22-slim
 
 WORKDIR /app
 
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-
-# Instalar dependencias del sistema si fueran necesarias
+# Prisma necesita OpenSSL
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libpq-dev \
+    openssl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 
-COPY . /app
+COPY prisma ./prisma
+RUN npx prisma generate
 
+COPY . .
+
+ENV NODE_ENV=production
+ENV PRISMA_HIDE_UPDATE_MESSAGE=1
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Aplica migraciones pendientes y arranca la API
+CMD ["sh", "-c", "node scripts/migrate.js && node src/server.js"]
