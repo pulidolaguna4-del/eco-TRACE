@@ -143,6 +143,31 @@ const MODOS_RUTA = {
 
 
 // =========================================================
+// UTILIDADES DEL PANEL
+// =========================================================
+
+// Minúsculas y sin tildes, para buscar "bolivar" y encontrar "Bolívar"
+function normalizarTexto(texto) {
+  return texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+}
+
+// Distancia en línea recta (fórmula del haversine)
+function distanciaEnKm([lat1, lng1], [lat2, lng2]) {
+  const rad = (grados) => (grados * Math.PI) / 180
+  const dLat = rad(lat2 - lat1)
+  const dLng = rad(lng2 - lng1)
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLng / 2) ** 2
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+function formatearDistanciaKm(km) {
+  return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toLocaleString('es-CO', { maximumFractionDigits: 1 })} km`
+}
+
+
+// =========================================================
 // FORMULARIO DE ENTREGA
 // =========================================================
 
@@ -188,6 +213,21 @@ function Mapa() {
 
   // Filtros de categorías seleccionadas (arreglo)
   const [categoriasSeleccionadas, setCategoriasSeleccionadas] = useState([])
+
+  // Búsqueda por texto en el panel lateral
+  const [busqueda, setBusqueda] = useState('')
+
+  // Punto elegido desde la lista (se resalta en el panel)
+  const [puntoEnfocado, setPuntoEnfocado] = useState(null)
+
+  // Aviso de "inicia sesión para proponer" cuando no hay sesión
+  const [pedirSesion, setPedirSesion] = useState(false)
+
+  // Marcadores de Leaflet por id de punto (para abrir su ventana desde la lista)
+  const marcadores = useRef({})
+
+  // Zona del mapa (en celular se desplaza hasta ella al elegir un punto)
+  const refZonaMapa = useRef(null)
 
   const [seleccionando, setSeleccionando] = useState(false)
 
@@ -429,16 +469,78 @@ function Mapa() {
     )
   }
 
-  const puntosFiltrados =
-    categoriasSeleccionadas.length === 0
-      ? puntos
-      : puntos.filter((punto) =>
-          punto.categorias.some((catPunto) =>
-            categoriasSeleccionadas.some(
-              (catFiltro) => catFiltro.toLowerCase() === catPunto.toLowerCase()
-            )
-          )
+  const textoBuscado = normalizarTexto(busqueda.trim())
+
+  // Filtro por categorías y por el texto buscado (nombre, dirección o descripción)
+  const puntosFiltrados = puntos.filter((punto) => {
+    const cumpleCategoria =
+      categoriasSeleccionadas.length === 0 ||
+      punto.categorias.some((catPunto) =>
+        categoriasSeleccionadas.some(
+          (catFiltro) => catFiltro.toLowerCase() === catPunto.toLowerCase()
         )
+      )
+
+    if (!cumpleCategoria) return false
+    if (!textoBuscado) return true
+
+    return [punto.nombre, punto.direccion, punto.descripcion]
+      .some((campo) => normalizarTexto(campo ?? '').includes(textoBuscado))
+  })
+
+  // Lista del panel: por cercanía si conocemos tu ubicación; si no, por calificación
+  const puntosLista = puntosFiltrados
+    .map((punto) => ({
+      ...punto,
+      distanciaKm: ubicacionUsuario
+        ? distanciaEnKm(ubicacionUsuario, [punto.latitud, punto.longitud])
+        : null
+    }))
+    .sort((a, b) =>
+      a.distanciaKm !== null
+        ? a.distanciaKm - b.distanciaKm
+        : (b.calificacion_promedio ?? 0) - (a.calificacion_promedio ?? 0) ||
+          a.nombre.localeCompare(b.nombre, 'es')
+    )
+
+  const hayFiltros = categoriasSeleccionadas.length > 0 || textoBuscado !== ''
+
+  const limpiarFiltros = () => {
+    setCategoriasSeleccionadas([])
+    setBusqueda('')
+  }
+
+  // Desde la lista: vuela al punto y abre su ventana en el mapa
+  const irAPunto = (punto) => {
+    setPuntoEnfocado(punto.id)
+
+    if (window.innerWidth < 1024) {
+      refZonaMapa.current?.scrollIntoView({
+        behavior: prefiereReducido ? 'auto' : 'smooth',
+        block: 'start'
+      })
+    }
+
+    if (!mapa) return
+
+    const abrir = () => marcadores.current[punto.id]?.openPopup()
+    mapa.once('moveend', abrir)
+    mapa.flyTo([punto.latitud, punto.longitud], 17, {
+      duration: prefiereReducido ? 0 : 0.9
+    })
+  }
+
+  // Proponer un punto exige sesión: sin ella, se invita a entrar
+  const proponerPunto = () => {
+    if (!localStorage.getItem('access_token')) {
+      setPedirSesion(true)
+      return
+    }
+    setPedirSesion(false)
+    iniciarSeleccion()
+  }
+
+  const enModoProponer = seleccionando || Boolean(ubicacionSeleccionada) || mostrarFormulario
 
 
   // =======================================================
@@ -1146,113 +1248,277 @@ const registrarEntrega = async (e) => {
   // =======================================================
 
   return (
-    <div className="min-h-screen bg-[#f1f8f4] dark:bg-[#0f1512] text-[#333333] dark:text-[#f2f5f3] p-4 sm:p-6 lg:p-8 transition-colors duration-300 font-sans">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="bg-[#f1f8f4] dark:bg-[#0f1512] text-[#333333] dark:text-[#f2f5f3] transition-colors duration-300 font-sans flex flex-col lg:flex-row lg:h-[calc(100vh-4rem)]">
 
-        {/* =================================================
-            HEADER
-        ================================================= */}
+      {/* =================================================
+          PANEL LATERAL (debajo del mapa en celular)
+      ================================================= */}
 
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <motion.button
-              type="button"
-              whileHover={prefiereReducido ? {} : { scale: 1.02 }}
-              whileTap={prefiereReducido ? {} : { scale: 0.98 }}
-              onClick={() => navigate('/')}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#1a2320] text-[#218739] dark:text-[#2fa350] border border-gray-100 dark:border-gray-800/40 rounded-xl text-xs font-bold shadow-2xs hover:shadow-xs transition-all cursor-pointer"
-            >
-              ← Volver al inicio
-            </motion.button>
+      <aside className="order-2 lg:order-1 w-full lg:w-[420px] xl:w-[460px] shrink-0 lg:h-full lg:overflow-y-auto bg-white dark:bg-[#121816] border-t lg:border-t-0 lg:border-r border-gray-100 dark:border-gray-800/50">
+        <div className="p-5 sm:p-6 space-y-5">
 
-            <h1 className="text-2xl sm:text-3xl font-black mt-3 bg-gradient-to-r from-[#218739] to-[#4caf68] dark:from-[#2fa350] dark:to-[#4caf68] bg-clip-text text-transparent">
-              Mapa Interactivo de Puntos
-            </h1>
+        {/* ENCABEZADO */}
+        <motion.div
+          initial={prefiereReducido ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45 }}
+        >
+          <span className="text-xs font-extrabold uppercase tracking-[0.18em] text-[#218739] dark:text-[#2fa350]">
+            📍 Ciudad Bolívar
+          </span>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-gray-900 dark:text-white mt-1">
+            {enModoProponer ? 'Proponer un punto' : 'Mapa de puntos ecológicos'}
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-[#a8b3ae] mt-1.5 leading-relaxed">
+            {enModoProponer
+              ? 'Ubica el punto, completa sus datos y un administrador lo revisará antes de publicarlo.'
+              : 'Encuentra dónde reciclar, donar ropa o dejar tus electrónicos, y pide la ruta desde tu ubicación.'}
+          </p>
+        </motion.div>
 
-            <p className="text-xs sm:text-sm text-gray-500 dark:text-[#a8b3ae] font-medium mt-1">
-              Explora y registra lugares de reciclaje en Ciudad Bolívar
-            </p>
-          </div>
+        {enModoProponer ? (
 
-          {/* BOTÓN REGISTRAR */}
-
-          <div>
-            {!seleccionando ? (
-              <motion.button
-                type="button"
-                whileHover={prefiereReducido ? {} : { scale: 1.03 }}
-                whileTap={prefiereReducido ? {} : { scale: 0.97 }}
-                onClick={iniciarSeleccion}
-                className="px-5 py-2.5 bg-gradient-to-r from-[#218739] to-[#39aa53] dark:from-[#2fa350] dark:to-[#39aa53] text-white font-bold text-xs rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer flex items-center gap-2"
-              >
-                <span>➕</span>
-                <span>Agregar nuevo punto</span>
-              </motion.button>
-            ) : (
-              <motion.button
-                type="button"
-                whileHover={prefiereReducido ? {} : { scale: 1.03 }}
-                whileTap={prefiereReducido ? {} : { scale: 0.97 }}
-                onClick={cancelarSeleccion}
-                className="px-5 py-2.5 bg-[#d93025] hover:bg-[#b3261e] text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-2"
-              >
-                <span>✕</span>
-                <span>Cancelar selección</span>
-              </motion.button>
-            )}
-          </div>
-        </div>
-
-
-        {/* =================================================
-            FILTROS DE SELECCIÓN MÚLTIPLE
-        ================================================= */}
-
-        <div className="bg-white dark:bg-[#1a2320] p-4 rounded-2xl border border-gray-100 dark:border-gray-800/40 shadow-2xs flex flex-wrap items-center justify-between gap-4 transition-colors">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-[#a8b3ae] mr-2">
-              Filtrar por:
-            </span>
-
+          /* VOLVER A LA LISTA + PASOS */
+          <div className="flex items-center justify-between gap-3">
             <button
               type="button"
-              onClick={() => toggleFiltroCategoria('Todos')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 ${
-                categoriasSeleccionadas.length === 0
-                  ? 'bg-[#218739] dark:bg-[#2fa350] text-white shadow-xs'
-                  : 'bg-gray-50 dark:bg-[#121816] text-gray-600 dark:text-[#a8b3ae] hover:bg-gray-100 dark:hover:bg-gray-800/40'
-              }`}
+              onClick={cancelarSeleccion}
+              className="text-xs font-bold text-gray-500 dark:text-[#a8b3ae] hover:text-[#d93025] dark:hover:text-[#ef5350] cursor-pointer"
             >
-              <span>📍</span>
-              <span>Todos</span>
+              ← Cancelar y volver a la lista
             </button>
 
-            {CATEGORIAS_DISPONIBLES.map((cat) => {
-              const activa = categoriasSeleccionadas.includes(cat.id)
-              return (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => toggleFiltroCategoria(cat.id)}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 ${
-                    activa
-                      ? 'bg-[#218739] dark:bg-[#2fa350] text-white shadow-xs'
-                      : 'bg-gray-50 dark:bg-[#121816] text-gray-600 dark:text-[#a8b3ae] hover:bg-gray-100 dark:hover:bg-gray-800/40'
-                  }`}
-                >
-                  <span>{cat.icono}</span>
-                  <span>{cat.nombre}</span>
-                  {activa && <span className="text-[10px] bg-white/20 px-1 rounded">✓</span>}
-                </button>
-              )
-            })}
+            <ol className="flex items-center gap-1.5 text-[11px] font-bold" aria-label="Pasos">
+              {['Ubicación', 'Datos'].map((paso, n) => {
+                const actual = (ubicacionSeleccionada ? 1 : 0) === n
+                const hecho = n === 0 && Boolean(ubicacionSeleccionada)
+                return (
+                  <li
+                    key={paso}
+                    aria-current={actual ? 'step' : undefined}
+                    className={`px-2.5 py-1 rounded-full ${
+                      actual
+                        ? 'bg-[#218739] dark:bg-[#2fa350] text-white'
+                        : hecho
+                        ? 'bg-[#218739]/10 dark:bg-[#2fa350]/15 text-[#218739] dark:text-[#2fa350]'
+                        : 'bg-gray-100 dark:bg-[#1a2320] text-gray-400'
+                    }`}
+                  >
+                    {hecho ? '✓' : `${n + 1}.`} {paso}
+                  </li>
+                )
+              })}
+            </ol>
           </div>
 
-          <div className="text-xs font-semibold text-gray-500 dark:text-[#a8b3ae] bg-gray-50 dark:bg-[#121816] px-3 py-1.5 rounded-xl">
-            Mostrando <strong>{puntosFiltrados.length}</strong>{' '}
-            {puntosFiltrados.length === 1 ? 'punto' : 'puntos'}
-          </div>
-        </div>
+        ) : (
+          <>
+            {/* BUSCADOR */}
+            <div className="relative">
+              <label htmlFor="buscar-punto" className="sr-only">Buscar un punto</label>
+              <span className="absolute inset-y-0 left-4 flex items-center text-gray-400 pointer-events-none" aria-hidden="true">
+                🔎
+              </span>
+              <input
+                id="buscar-punto"
+                type="search"
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                placeholder="Busca por nombre o dirección"
+                className="w-full pl-11 pr-4 py-3 text-sm rounded-2xl bg-gray-50 dark:bg-[#0f1512] text-gray-900 dark:text-white border border-gray-200 dark:border-gray-800 placeholder-gray-400 focus:outline-hidden focus:border-[#218739] dark:focus:border-[#2fa350] focus:ring-2 focus:ring-[#218739]/20 transition-all"
+              />
+            </div>
+
+            {/* FILTROS POR CATEGORÍA */}
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar por categoría">
+              <button
+                type="button"
+                onClick={() => toggleFiltroCategoria('Todos')}
+                aria-pressed={categoriasSeleccionadas.length === 0}
+                className={`px-3.5 py-2 rounded-full text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 border ${
+                  categoriasSeleccionadas.length === 0
+                    ? 'bg-[#218739] dark:bg-[#2fa350] text-white border-transparent shadow-xs'
+                    : 'bg-white dark:bg-[#1a2320] text-gray-600 dark:text-[#a8b3ae] border-gray-200 dark:border-gray-800 hover:border-[#218739]/40'
+                }`}
+              >
+                Todos
+              </button>
+
+              {CATEGORIAS_DISPONIBLES.map((cat) => {
+                const activa = categoriasSeleccionadas.includes(cat.id)
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => toggleFiltroCategoria(cat.id)}
+                    aria-pressed={activa}
+                    className={`px-3.5 py-2 rounded-full text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 border ${
+                      activa
+                        ? 'bg-[#218739] dark:bg-[#2fa350] text-white border-transparent shadow-xs'
+                        : 'bg-white dark:bg-[#1a2320] text-gray-600 dark:text-[#a8b3ae] border-gray-200 dark:border-gray-800 hover:border-[#218739]/40'
+                    }`}
+                  >
+                    <span aria-hidden="true">{cat.icono}</span>
+                    {cat.nombre}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* PROPONER UN PUNTO */}
+            <motion.div
+              whileHover={prefiereReducido ? {} : { y: -2 }}
+              className="rounded-2xl border border-dashed border-[#218739]/40 dark:border-[#2fa350]/40 bg-[#218739]/5 dark:bg-[#2fa350]/5 p-4 flex items-center justify-between gap-3"
+            >
+              <p className="text-xs text-gray-600 dark:text-[#a8b3ae]">
+                <strong className="block text-sm text-gray-900 dark:text-white">¿Falta un punto?</strong>
+                Propónlo con tu ubicación, una dirección o un clic.
+              </p>
+              <button
+                type="button"
+                onClick={proponerPunto}
+                className="shrink-0 px-4 py-2.5 bg-[#218739] hover:bg-[#176b2b] dark:bg-[#2fa350] dark:hover:bg-[#218739] text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+              >
+                ➕ Proponer
+              </button>
+            </motion.div>
+
+            <AnimatePresence>
+              {pedirSesion && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 p-4 text-xs text-amber-900 dark:text-amber-300 flex items-center justify-between gap-3">
+                    <span>🔒 Inicia sesión para proponer puntos.</span>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/login')}
+                      className="shrink-0 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold cursor-pointer"
+                    >
+                      Iniciar sesión
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* LISTA DE PUNTOS */}
+            <div>
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <p className="text-xs font-bold text-gray-500 dark:text-[#a8b3ae]">
+                  {cargando
+                    ? 'Cargando puntos...'
+                    : `${puntosLista.length} ${puntosLista.length === 1 ? 'punto' : 'puntos'}${ubicacionUsuario ? ' · por cercanía' : ''}`}
+                </p>
+
+                {!ubicacionUsuario && !cargando && puntosLista.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={obtenerUbicacionUsuario}
+                    disabled={obteniendoUbicacion}
+                    className="text-xs font-bold text-[#218739] dark:text-[#2fa350] hover:underline cursor-pointer disabled:opacity-60"
+                  >
+                    {obteniendoUbicacion ? 'Ubicándote...' : '🎯 Ver los más cercanos'}
+                  </button>
+                )}
+              </div>
+
+              {cargando ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((n) => (
+                    <div key={n} className="h-24 rounded-2xl bg-gray-100 dark:bg-[#1a2320] animate-pulse" />
+                  ))}
+                </div>
+              ) : puntosLista.length === 0 ? (
+                <div className="text-center py-10 px-4 rounded-2xl bg-gray-50 dark:bg-[#1a2320]">
+                  <span className="text-3xl block mb-2">🍃</span>
+                  <p className="text-sm font-bold text-gray-800 dark:text-[#f2f5f3]">
+                    {hayFiltros ? 'Ningún punto coincide con tu búsqueda' : 'Aún no hay puntos aprobados'}
+                  </p>
+                  {hayFiltros && (
+                    <button
+                      type="button"
+                      onClick={limpiarFiltros}
+                      className="mt-3 text-xs font-bold text-[#218739] dark:text-[#2fa350] hover:underline cursor-pointer"
+                    >
+                      Quitar filtros
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <ul className="space-y-3">
+                  {puntosLista.map((punto, n) => {
+                    const { emoji, color } = obtenerIconoYColorPorCategorias(punto.categorias)
+                    const enfocado = puntoEnfocado === punto.id
+
+                    return (
+                      <motion.li
+                        key={punto.id}
+                        layout={!prefiereReducido}
+                        initial={prefiereReducido ? false : { opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3, delay: prefiereReducido ? 0 : Math.min(n * 0.04, 0.3) }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => irAPunto(punto)}
+                          className={`group w-full text-left rounded-2xl border p-4 flex gap-4 transition-all cursor-pointer ${
+                            enfocado
+                              ? 'bg-[#218739]/5 dark:bg-[#2fa350]/10 border-[#218739]/50 dark:border-[#2fa350]/50 shadow-md'
+                              : 'bg-white dark:bg-[#1a2320] border-gray-100 dark:border-gray-800/50 hover:border-[#218739]/30 hover:shadow-md'
+                          }`}
+                        >
+                          <span
+                            className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center text-xl text-white shadow-sm group-hover:scale-110 transition-transform"
+                            style={{ backgroundColor: color }}
+                            aria-hidden="true"
+                          >
+                            {emoji}
+                          </span>
+
+                          <span className="flex-1 min-w-0">
+                            <span className="flex items-start justify-between gap-2">
+                              <span className="font-extrabold text-sm text-gray-900 dark:text-white leading-snug">
+                                {punto.nombre}
+                              </span>
+                              {punto.distanciaKm !== null && (
+                                <span className="shrink-0 text-[11px] font-bold text-[#218739] dark:text-[#2fa350] bg-[#218739]/10 dark:bg-[#2fa350]/15 px-2 py-0.5 rounded-full">
+                                  {formatearDistanciaKm(punto.distanciaKm)}
+                                </span>
+                              )}
+                            </span>
+                            <span className="block text-xs text-gray-500 dark:text-[#a8b3ae] mt-0.5 truncate">
+                              📍 {punto.direccion}
+                            </span>
+                            <span className="flex items-center justify-between gap-2 mt-2">
+                              <CategoriasBadges categorias={punto.categorias} />
+                              <span className="shrink-0 text-[11px] text-gray-500 dark:text-[#a8b3ae] flex items-center gap-1">
+                                {punto.total_resenas > 0 ? (
+                                  <>
+                                    <span className="text-amber-400" aria-hidden="true">★</span>
+                                    <strong className="text-gray-700 dark:text-[#dce4e0]">
+                                      {Number(punto.calificacion_promedio).toLocaleString('es-CO', { maximumFractionDigits: 1 })}
+                                    </strong>
+                                    ({punto.total_resenas})
+                                  </>
+                                ) : (
+                                  'Sin reseñas'
+                                )}
+                              </span>
+                            </span>
+                          </span>
+                        </button>
+                      </motion.li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+          </>
+        )}
 
 
         {/* =================================================
@@ -1271,7 +1537,7 @@ const registrarEntrega = async (e) => {
                 📍 ¿Dónde está el nuevo punto ecológico?
               </p>
 
-              <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-4 items-start">
+              <div className="grid grid-cols-1 gap-3 items-start">
                 {/* OPCIÓN 1: MI UBICACIÓN */}
                 <button
                   type="button"
@@ -1321,7 +1587,7 @@ const registrarEntrega = async (e) => {
                   <p className="text-[11px] font-bold text-gray-600 dark:text-[#a8b3ae] mb-2">
                     Encontramos varias coincidencias, elige la correcta:
                   </p>
-                  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <ul className="grid grid-cols-1 gap-2">
                     {resultadosDireccion.map((resultado) => (
                       <li key={resultado.coords.join(',')}>
                         <button
@@ -1362,7 +1628,7 @@ const registrarEntrega = async (e) => {
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-2xl text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between gap-4 shadow-2xs"
+              className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-2xl text-xs text-amber-800 dark:text-amber-300 flex flex-col gap-3 shadow-2xs"
             >
               <div>
                 <span className="font-bold block text-sm">
@@ -1379,7 +1645,7 @@ const registrarEntrega = async (e) => {
                 )}
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+              <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={iniciarSeleccion}
@@ -1443,15 +1709,15 @@ const registrarEntrega = async (e) => {
                 opacity: 0,
                 scale: prefiereReducido ? 1 : 0.96
               }}
-              className="bg-white dark:bg-[#1a2320] p-6 sm:p-8 rounded-3xl border border-gray-100 dark:border-gray-800/40 shadow-xl transition-colors"
+              className="bg-gray-50 dark:bg-[#1a2320] p-5 rounded-2xl border border-gray-100 dark:border-gray-800/40 transition-colors"
             >
-              <h2 className="text-lg font-extrabold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-                <span>➕</span>
-                Registrar Nuevo Punto Ecológico
+              <h2 className="text-base font-extrabold text-gray-900 dark:text-white mb-5 flex items-center gap-2">
+                <span>📝</span>
+                Datos del punto
               </h2>
 
               <form onSubmit={crearPunto} className="space-y-5">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 gap-5">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 dark:text-[#f2f5f3] uppercase tracking-wider mb-2">
                       Nombre del punto
@@ -1462,7 +1728,7 @@ const registrarEntrega = async (e) => {
                       placeholder="Ej: Punto de Reciclaje Comunitario"
                       value={formulario.nombre}
                       onChange={manejarCambioFormulario}
-                      className="w-full px-4 py-2.5 text-xs rounded-xl bg-gray-50 dark:bg-[#0f1512] text-gray-900 dark:text-white border border-gray-200 dark:border-gray-800 focus:outline-hidden focus:border-[#218739] dark:focus:border-[#2fa350] transition-all"
+                      className="w-full px-4 py-2.5 text-sm rounded-xl bg-white dark:bg-[#0f1512] text-gray-900 dark:text-white border border-gray-200 dark:border-gray-800 focus:outline-hidden focus:border-[#218739] dark:focus:border-[#2fa350] transition-all"
                     />
                   </div>
 
@@ -1476,7 +1742,7 @@ const registrarEntrega = async (e) => {
                       placeholder="Ej: Carrera 50 # 20-30"
                       value={formulario.direccion}
                       onChange={manejarCambioFormulario}
-                      className="w-full px-4 py-2.5 text-xs rounded-xl bg-gray-50 dark:bg-[#0f1512] text-gray-900 dark:text-white border border-gray-200 dark:border-gray-800 focus:outline-hidden focus:border-[#218739] dark:focus:border-[#2fa350] transition-all"
+                      className="w-full px-4 py-2.5 text-sm rounded-xl bg-white dark:bg-[#0f1512] text-gray-900 dark:text-white border border-gray-200 dark:border-gray-800 focus:outline-hidden focus:border-[#218739] dark:focus:border-[#2fa350] transition-all"
                     />
                   </div>
 
@@ -1490,7 +1756,7 @@ const registrarEntrega = async (e) => {
                       placeholder="Ej: Ciudad Bolívar"
                       value={formulario.localidad}
                       onChange={manejarCambioFormulario}
-                      className="w-full px-4 py-2.5 text-xs rounded-xl bg-gray-50 dark:bg-[#0f1512] text-gray-900 dark:text-white border border-gray-200 dark:border-gray-800 focus:outline-hidden focus:border-[#218739] dark:focus:border-[#2fa350] transition-all"
+                      className="w-full px-4 py-2.5 text-sm rounded-xl bg-white dark:bg-[#0f1512] text-gray-900 dark:text-white border border-gray-200 dark:border-gray-800 focus:outline-hidden focus:border-[#218739] dark:focus:border-[#2fa350] transition-all"
                     />
                   </div>
                 </div>
@@ -1505,7 +1771,7 @@ const registrarEntrega = async (e) => {
                     placeholder="Detalla qué tipos de materiales o condiciones de entrega se aceptan"
                     value={formulario.descripcion}
                     onChange={manejarCambioFormulario}
-                    className="w-full px-4 py-2.5 text-xs rounded-xl bg-gray-50 dark:bg-[#0f1512] text-gray-900 dark:text-white border border-gray-200 dark:border-gray-800 focus:outline-hidden focus:border-[#218739] dark:focus:border-[#2fa350] transition-all"
+                    className="w-full px-4 py-2.5 text-sm rounded-xl bg-white dark:bg-[#0f1512] text-gray-900 dark:text-white border border-gray-200 dark:border-gray-800 focus:outline-hidden focus:border-[#218739] dark:focus:border-[#2fa350] transition-all"
                   />
                 </div>
 
@@ -1516,7 +1782,7 @@ const registrarEntrega = async (e) => {
                     Categorías de residuos aceptadas (selecciona una o varias)
                   </label>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 gap-2">
                     {CATEGORIAS_DISPONIBLES.map((item) => {
                       const seleccionada = formulario.categorias.includes(item.id)
 
@@ -1528,7 +1794,7 @@ const registrarEntrega = async (e) => {
                           className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all flex items-center justify-between gap-3 ${
                             seleccionada
                               ? 'bg-[#218739]/10 dark:bg-[#2fa350]/20 border-[#218739] dark:border-[#2fa350] text-[#218739] dark:text-[#2fa350] font-bold shadow-2xs'
-                              : 'bg-gray-50 dark:bg-[#0f1512] border-gray-200 dark:border-gray-800 text-gray-600 dark:text-[#a8b3ae] hover:bg-gray-100 dark:hover:bg-gray-800/40'
+                              : 'bg-white dark:bg-[#0f1512] border-gray-200 dark:border-gray-800 text-gray-600 dark:text-[#a8b3ae] hover:bg-gray-100 dark:hover:bg-gray-800/40'
                           }`}
                         >
                           <div className="flex items-center gap-3">
@@ -1599,11 +1865,22 @@ const registrarEntrega = async (e) => {
         </AnimatePresence>
 
 
-        {/* =================================================
-            MAPA
-        ================================================= */}
+        </div>
+      </aside>
 
-        <div className="bg-white dark:bg-[#1a2320] rounded-3xl border border-gray-100 dark:border-gray-800/40 shadow-sm overflow-hidden h-[500px] sm:h-[600px] relative">
+
+      {/* =================================================
+          MAPA (ocupa todo el alto en escritorio)
+      ================================================= */}
+
+      <section
+        ref={refZonaMapa}
+        // En celular la altura es fija (62vh); flex-1 solo en escritorio, porque
+        // en columna haría que el alto del mapa se resolviera en 0
+        className="order-1 lg:order-2 relative w-full h-[62vh] min-h-[420px] lg:h-full lg:min-h-0 lg:flex-1 scroll-mt-16"
+        aria-label="Mapa de puntos ecológicos"
+      >
+        <div className="relative h-full overflow-hidden">
           {cargando && (
             <div className="absolute inset-0 z-20 bg-white/80 dark:bg-[#0f1512]/80 backdrop-blur-xs flex flex-col items-center justify-center gap-3">
               <div className="w-8 h-8 border-4 border-[#218739]/30 border-t-[#218739] rounded-full animate-spin"></div>
@@ -1697,6 +1974,11 @@ const registrarEntrega = async (e) => {
     key={punto.id}
     position={[punto.latitud, punto.longitud]}
     icon={obtenerIconoPorCategorias(punto.categorias)}
+    ref={(marcador) => {
+      if (marcador) marcadores.current[punto.id] = marcador
+      else delete marcadores.current[punto.id]
+    }}
+    eventHandlers={{ click: () => setPuntoEnfocado(punto.id) }}
   >
     <Popup>
       <div className="p-1 max-w-xs font-sans">
@@ -1754,24 +2036,6 @@ const registrarEntrega = async (e) => {
             : '🚗 Cómo llegar'}
         </button>
 
-        {/* RESEÑAS */}
-        <button
-          type="button"
-          onClick={() => setPuntoResenas(punto)}
-          className="w-full mt-2 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
-        >
-          ⭐ Calificar y ver reseñas
-        </button>
-
-        {/* REPORTE */}
-        <button
-          type="button"
-          onClick={() => abrirFormularioReporte(punto)}
-          className="w-full mt-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
-        >
-          🚩 Reportar punto
-        </button>
-
         {/* ENTREGA */}
         <button
           type="button"
@@ -1780,6 +2044,26 @@ const registrarEntrega = async (e) => {
         >
           ♻️ Registrar entrega
         </button>
+
+        <div className="grid grid-cols-2 gap-2 mt-2">
+          {/* RESEÑAS */}
+          <button
+            type="button"
+            onClick={() => setPuntoResenas(punto)}
+            className="px-2 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
+          >
+            ⭐ Reseñas
+          </button>
+
+          {/* REPORTE */}
+          <button
+            type="button"
+            onClick={() => abrirFormularioReporte(punto)}
+            className="px-2 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
+          >
+            🚩 Reportar
+          </button>
+        </div>
 
       </div>
     </Popup>
@@ -1802,7 +2086,7 @@ const registrarEntrega = async (e) => {
         </strong>
 
         <span>
-          Arrástrame para ajustar el sitio y completa los datos en el panel superior.
+          Arrástrame para ajustar el sitio y completa los datos en el panel.
         </span>
       </div>
     </Popup>
@@ -2548,8 +2832,49 @@ const registrarEntrega = async (e) => {
               </button>
             </div>
           )}
+
+          {/* LEYENDA DE LOS ICONOS */}
+          <div className="absolute top-3 left-14 z-[1000] hidden sm:flex items-center gap-3 px-3 py-2 rounded-xl bg-white/90 dark:bg-[#1a2320]/90 backdrop-blur-md border border-gray-200 dark:border-gray-700 shadow-lg text-[11px] font-bold text-gray-700 dark:text-[#dce4e0]">
+            {[
+              { nombre: 'Reciclaje', icono: '♻️', color: '#218739' },
+              { nombre: 'Ropa', icono: '👕', color: '#1976d2' },
+              { nombre: 'Electrónicos', icono: '💻', color: '#7b1fa2' },
+              { nombre: 'Varias', icono: '🌟', color: '#10b981' }
+            ].map((item) => (
+              <span key={item.nombre} className="flex items-center gap-1.5">
+                <span
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] border-2 border-white shadow-sm"
+                  style={{ backgroundColor: item.color }}
+                  aria-hidden="true"
+                >
+                  {item.icono}
+                </span>
+                {item.nombre}
+              </span>
+            ))}
+          </div>
+
+          {/* AVISO MIENTRAS SE MARCA UN PUNTO */}
+          <div className="absolute top-16 sm:top-16 inset-x-0 z-[1000] flex justify-center pointer-events-none px-4">
+            <AnimatePresence>
+              {seleccionando && (
+                <motion.div
+                  initial={prefiereReducido ? { opacity: 0 } : { opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={prefiereReducido ? { opacity: 0 } : { opacity: 0, y: -10 }}
+                  className="px-4 py-2.5 rounded-full bg-[#176b2b] text-white text-xs font-bold shadow-xl flex items-center gap-2"
+                >
+                  <span className="relative flex w-2 h-2">
+                    <span className="absolute inline-flex w-full h-full rounded-full bg-[#7ee08f] opacity-75 motion-safe:animate-ping" />
+                    <span className="relative inline-flex w-2 h-2 rounded-full bg-[#7ee08f]" />
+                  </span>
+                  Haz clic dentro del área verde para marcar el punto
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
-      </div>
+      </section>
     </div>
   )
 }
