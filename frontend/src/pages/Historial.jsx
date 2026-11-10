@@ -269,16 +269,49 @@ function Historial() {
   const entregasFiltradas =
     filtro === 'todas' ? entregas : entregas.filter((e) => e.estado === filtro)
 
+  // Mismos estilos que las tarjetas de resumen de "Mis puntos"
   const resumen = [
-    { titulo: 'Entregas', valor: entregas.length, icono: '📦', detalle: 'Total registradas' },
-    { titulo: 'Kilos aportados', valor: formatearKg(kgAportados), icono: '⚖️', detalle: 'Sin contar rechazadas' },
-    { titulo: 'Pendientes', valor: contar('pendiente'), icono: '⏳', detalle: 'Esperando verificación' },
-    { titulo: 'Verificadas', valor: contar('verificada'), icono: '✅', detalle: 'Confirmadas por un administrador' }
+    {
+      titulo: 'Mis entregas',
+      valor: entregas.length,
+      icono: '📦',
+      fondoIcono: 'bg-emerald-50 dark:bg-emerald-950/20 text-[#218739] dark:text-[#2fa350]',
+      colorValor: 'text-gray-900 dark:text-white',
+      detalle: 'Total registradas',
+      colorDetalle: 'text-gray-400 font-semibold'
+    },
+    {
+      titulo: 'Kilos aportados',
+      valor: formatearKg(kgAportados),
+      icono: '⚖️',
+      fondoIcono: 'bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400',
+      colorValor: 'text-gray-900 dark:text-white',
+      detalle: 'Sin contar rechazadas',
+      colorDetalle: 'text-gray-400 font-semibold'
+    },
+    {
+      titulo: 'Pendientes',
+      valor: contar('pendiente'),
+      icono: '⏳',
+      fondoIcono: 'bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400',
+      colorValor: 'text-amber-500 dark:text-amber-400',
+      detalle: 'Esperando verificación',
+      colorDetalle: 'text-amber-600/80 font-bold'
+    },
+    {
+      titulo: 'Verificadas',
+      valor: contar('verificada'),
+      icono: '✓',
+      fondoIcono: 'bg-green-50 dark:bg-green-950/20 text-[#218739] dark:text-[#2fa350]',
+      colorValor: 'text-[#218739] dark:text-[#2fa350]',
+      detalle: 'Confirmadas por un administrador',
+      colorDetalle: 'text-green-600/80 font-bold'
+    }
   ]
 
   return (
     <div className="min-h-screen bg-[#f1f8f4] dark:bg-[#0f1512] text-[#333333] dark:text-[#f2f5f3] font-sans transition-colors duration-300 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-5xl mx-auto space-y-8">
+      <div className="max-w-7xl mx-auto space-y-8">
 
         {/* ENCABEZADO */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -291,30 +324,35 @@ function Historial() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => navigate('/mapa')}
-            className="self-start sm:self-auto px-5 py-2.5 bg-gradient-to-r from-[#218739] to-[#39aa53] dark:from-[#2fa350] dark:to-[#39aa53] text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer"
-          >
-            ♻️ Registrar una entrega
-          </button>
+          <div className="flex items-center gap-3">
+            <motion.button
+              type="button"
+              whileHover={prefiereReducido ? {} : { scale: 1.03 }}
+              whileTap={prefiereReducido ? {} : { scale: 0.97 }}
+              onClick={() => navigate('/mapa')}
+              className="px-5 py-2.5 bg-gradient-to-r from-[#218739] to-[#39aa53] dark:from-[#2fa350] dark:to-[#39aa53] text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-2"
+            >
+              <span>♻️</span>
+              <span>Registrar una entrega</span>
+            </motion.button>
+          </div>
         </div>
 
-        {/* RESUMEN */}
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* TARJETAS DE RESUMEN */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {resumen.map((tarjeta) => (
             <div
               key={tarjeta.titulo}
-              className="bg-white dark:bg-[#1a2320] p-5 rounded-2xl border border-gray-100 dark:border-gray-800/40 shadow-2xs"
+              className="bg-white dark:bg-[#1a2320] p-6 rounded-2xl border border-gray-100 dark:border-gray-800/40 shadow-2xs"
             >
-              <div className="flex justify-between items-center text-[11px] font-bold text-gray-400 dark:text-[#a8b3ae] uppercase">
+              <div className="flex justify-between items-center text-xs font-bold text-gray-400 dark:text-[#a8b3ae] uppercase">
                 <span>{tarjeta.titulo}</span>
-                <span className="text-sm">{tarjeta.icono}</span>
+                <span className={`p-2 rounded-xl text-sm ${tarjeta.fondoIcono}`}>{tarjeta.icono}</span>
               </div>
-              <div className="mt-2 text-2xl font-black text-gray-900 dark:text-white">
+              <div className={`mt-3 text-3xl font-black ${tarjeta.colorValor}`}>
                 {cargando ? '...' : tarjeta.valor}
               </div>
-              <p className="text-[11px] text-gray-400 mt-1 font-semibold">{tarjeta.detalle}</p>
+              <p className={`text-[11px] mt-1 ${tarjeta.colorDetalle}`}>{tarjeta.detalle}</p>
             </div>
           ))}
         </section>
@@ -327,12 +365,12 @@ function Historial() {
 
         {/* LISTA */}
         {!error && (
-          <section className="bg-white dark:bg-[#1a2320] rounded-3xl border border-gray-100 dark:border-gray-800/40 shadow-xs overflow-hidden">
-            <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-800/40 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <section className="bg-white dark:bg-[#1a2320] rounded-3xl border border-gray-100 dark:border-gray-800/40 shadow-xs overflow-hidden transition-colors">
+            <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-800/40 flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gray-50/30 dark:bg-[#121816]/30">
               <div>
-                <h2 className="text-base font-extrabold text-gray-800 dark:text-[#f2f5f3]">
-                  Historial
-                </h2>
+                <h3 className="text-base font-extrabold text-gray-800 dark:text-[#f2f5f3]">
+                  Mis Entregas Registradas
+                </h3>
                 <p className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-1">
                   Haz clic en una entrega para ver el detalle completo.
                 </p>
@@ -363,9 +401,10 @@ function Historial() {
             </div>
 
             {cargando ? (
+              /* SKELETONS DE CARGA (igual que en Mis puntos) */
               <div className="p-6 space-y-4">
                 {[1, 2, 3].map((n) => (
-                  <div key={n} className="flex justify-between items-center gap-4 animate-pulse">
+                  <div key={n} className="flex justify-between items-center gap-4 animate-pulse pb-4 border-b border-gray-50 dark:border-gray-800/30">
                     <div className="space-y-2 flex-1">
                       <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded-md w-1/3"></div>
                       <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded-md w-1/2"></div>
@@ -375,18 +414,26 @@ function Historial() {
                 ))}
               </div>
             ) : entregas.length === 0 ? (
-              <div className="py-16 text-center px-4">
+              <div className="py-16 text-center">
                 <span className="text-4xl block mb-3">🍃</span>
-                <h3 className="text-lg font-bold text-gray-800 dark:text-[#f2f5f3]">
+                <h4 className="text-lg font-bold text-gray-800 dark:text-[#f2f5f3]">
                   Aún no tienes entregas registradas
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-1 max-w-sm mx-auto">
+                </h4>
+                <p className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-1 max-w-sm mx-auto px-4 mb-6">
                   Cuando registres una donación o un reciclaje en un punto del mapa, aparecerá aquí.
                 </p>
+                <button
+                  type="button"
+                  onClick={() => navigate('/mapa')}
+                  className="px-5 py-2.5 bg-[#218739] dark:bg-[#2fa350] hover:bg-[#176b2b] text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
+                >
+                  Registrar mi primera entrega
+                </button>
               </div>
             ) : entregasFiltradas.length === 0 ? (
-              <div className="py-12 text-center px-4">
-                <p className="text-sm font-semibold text-gray-600 dark:text-[#a8b3ae]">
+              <div className="py-16 text-center">
+                <span className="text-4xl block mb-3">🔎</span>
+                <p className="text-xs text-gray-500 dark:text-[#a8b3ae] max-w-sm mx-auto px-4">
                   No tienes entregas en estado “{FILTROS.find((f) => f.id === filtro)?.nombre.toLowerCase()}”.
                 </p>
               </div>
@@ -403,24 +450,24 @@ function Historial() {
                       <button
                         type="button"
                         onClick={() => setSeleccionada(entrega)}
-                        className="w-full text-left p-5 sm:px-6 flex items-center gap-4 hover:bg-gray-50/60 dark:hover:bg-gray-800/20 transition-colors cursor-pointer"
+                        className="w-full text-left p-6 flex items-center gap-4 hover:bg-gray-50/30 dark:hover:bg-gray-800/20 transition-colors cursor-pointer"
                       >
                         <span className="w-11 h-11 shrink-0 rounded-2xl bg-green-50 dark:bg-green-950/20 flex items-center justify-center text-xl">
                           {tipo.icono}
                         </span>
 
-                        <span className="flex-1 min-w-0">
-                          <span className="block font-extrabold text-sm text-gray-900 dark:text-[#f2f5f3] truncate">
+                        <span className="flex-1 min-w-0 space-y-1">
+                          <span className="block font-extrabold text-sm sm:text-base text-gray-900 dark:text-[#f2f5f3] truncate">
                             {entrega.nombre_articulo || tipo.nombre}
                           </span>
-                          <span className="block text-xs text-gray-500 dark:text-[#a8b3ae] mt-0.5 truncate">
+                          <span className="block text-xs text-gray-500 dark:text-[#a8b3ae] truncate">
                             {entrega.cantidad} {entrega.unidad}
                             {entrega.peso && entrega.unidad !== 'kg' ? ` · ${formatearKg(entrega.peso)}` : ''}
                             {' · '}
                             {entrega.punto_nombre || `Punto #${entrega.punto_id}`}
                           </span>
-                          <span className="block text-[11px] text-gray-400 mt-0.5">
-                            {formatearFecha(entrega.fecha)}
+                          <span className="block text-[11px] text-gray-400 font-medium">
+                            📅 {formatearFecha(entrega.fecha)}
                           </span>
                         </span>
 

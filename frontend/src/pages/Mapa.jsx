@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 
@@ -8,14 +8,23 @@ import {
   Marker,
   Popup,
   GeoJSON,
-  useMapEvents,
-  useMap
+  Polyline,
+  Circle,
+  useMapEvents
 } from 'react-leaflet'
 
 import L from 'leaflet'
-import booleanPointInPolygon from '@turf/boolean-point-in-polygon'
 
 import 'leaflet/dist/leaflet.css'
+
+import {
+  buscarDireccion,
+  calcularRuta as consultarRuta,
+  direccionDeCoordenadas,
+  enlaceGoogleMaps,
+  estaEnCiudadBolivar,
+  obtenerPosicionActual
+} from '../utils/geo'
 
 import {
   normalizarPunto,
@@ -33,70 +42,14 @@ import ResenasPunto, { Estrellas } from '../components/ResenasPunto'
 // SELECTOR DE UBICACIÓN PARA CREAR PUNTOS
 // =========================================================
 
-function SelectorUbicacion({
-  seleccionando,
-  setUbicacion,
-  limiteCiudadBolivar
-}) {
+// La validación (dentro de Ciudad Bolívar) la hace quien recibe el clic
+function SelectorUbicacion({ seleccionando, onSeleccionar }) {
   useMapEvents({
     click(e) {
       if (!seleccionando) return
-      if (!limiteCiudadBolivar) return
-
-      const punto = {
-        type: 'Feature',
-        geometry: {
-          type: 'Point',
-          coordinates: [
-            e.latlng.lng,
-            e.latlng.lat
-          ]
-        },
-        properties: {}
-      }
-
-      const dentroDeCiudadBolivar =
-        booleanPointInPolygon(
-          punto,
-          limiteCiudadBolivar
-        )
-
-      if (!dentroDeCiudadBolivar) {
-        alert(
-          'La ubicación seleccionada está fuera de Ciudad Bolívar. Selecciona un punto dentro de la localidad.'
-        )
-        return
-      }
-
-      setUbicacion([
-        e.latlng.lat,
-        e.latlng.lng
-      ])
+      onSeleccionar([e.latlng.lat, e.latlng.lng])
     }
   })
-
-  return null
-}
-
-
-// =========================================================
-// CAMBIAR CENTRO DEL MAPA
-// =========================================================
-
-function ControlVistaMapa({ ubicacion }) {
-  const map = useMap()
-
-  useEffect(() => {
-    if (!ubicacion) return
-
-    map.flyTo(
-      ubicacion,
-      15,
-      {
-        duration: 1
-      }
-    )
-  }, [ubicacion, map])
 
   return null
 }
@@ -155,6 +108,38 @@ const iconoUsuario = L.divIcon({
   iconSize: [22, 22],
   iconAnchor: [11, 11]
 })
+
+
+// =========================================================
+// ICONO DEL PUNTO QUE SE ESTÁ PROPONIENDO (ARRASTRABLE)
+// =========================================================
+
+const iconoNuevoPunto = L.divIcon({
+  className: '',
+  html: `
+    <div style="
+      width: 34px;
+      height: 34px;
+      border-radius: 50% 50% 50% 0;
+      background: #f59e0b;
+      border: 3px solid white;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+      transform: rotate(-45deg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: grab;
+    "><span style="transform: rotate(45deg); font-size: 15px;">➕</span></div>
+  `,
+  iconSize: [34, 34],
+  iconAnchor: [17, 34],
+  popupAnchor: [0, -34]
+})
+
+const MODOS_RUTA = {
+  carro: { nombre: 'En carro', icono: '🚗', color: '#1976d2', trazo: null },
+  pie: { nombre: 'A pie', icono: '🚶', color: '#7b1fa2', trazo: '2 10' }
+}
 
 
 // =========================================================
@@ -306,7 +291,41 @@ function Mapa() {
   // RUTA
   // =======================================================
 
+  // { coordenadas: [[lat, lng]], distancia, duracion }
   const [ruta, setRuta] = useState(null)
+
+  const [modoRuta, setModoRuta] = useState('carro')
+
+  // Origen con el que se calculó la ruta (para cambiar de modo sin volver a pedir la ubicación)
+  const [origenRuta, setOrigenRuta] = useState(null)
+
+  // Precisión en metros de la última ubicación obtenida
+  const [precisionUbicacion, setPrecisionUbicacion] = useState(null)
+
+  // Instancia de Leaflet (para centrar, ajustar a la ruta y cerrar popups)
+  const [mapa, setMapa] = useState(null)
+
+
+  // =======================================================
+  // UBICACIÓN DEL PUNTO NUEVO (MI UBICACIÓN / DIRECCIÓN / CLIC)
+  // =======================================================
+
+  const [textoDireccion, setTextoDireccion] = useState('')
+
+  const [resultadosDireccion, setResultadosDireccion] = useState([])
+
+  const [buscandoDireccion, setBuscandoDireccion] = useState(false)
+
+  const [ubicandoPunto, setUbicandoPunto] = useState(false)
+
+  // Error o aviso del panel de selección
+  const [avisoSeleccion, setAvisoSeleccion] = useState('')
+
+  // Nota bajo las coordenadas (precisión, ubicación aproximada...)
+  const [notaUbicacion, setNotaUbicacion] = useState('')
+
+  // Si el usuario escribió la dirección a mano, ya no se llena sola
+  const direccionEditada = useRef(false)
 
   const [cargandoRuta, setCargandoRuta] = useState(false)
 
@@ -435,120 +454,89 @@ function Mapa() {
 
 
   // =======================================================
-  // OBTENER UBICACIÓN DEL USUARIO
+  // EL MAPA SE REACOMODA SI CAMBIA EL TAMAÑO DE SU CAJA
+  // (sin esto Leaflet deja zonas grises al cargar)
   // =======================================================
 
-  const obtenerUbicacionUsuario = () => {
+  useEffect(() => {
+    if (!mapa) return
+
+    const observador = new ResizeObserver(() => mapa.invalidateSize())
+    observador.observe(mapa.getContainer())
+
+    return () => observador.disconnect()
+  }, [mapa])
+
+
+  // =======================================================
+  // OBTENER UBICACIÓN DEL USUARIO (BOTÓN 📍)
+  // =======================================================
+
+  const obtenerUbicacionUsuario = async () => {
     setErrorRuta('')
     setObteniendoUbicacion(true)
 
-    if (!navigator.geolocation) {
-      setErrorRuta('Tu navegador no permite obtener tu ubicación.')
-      setObteniendoUbicacion(false)
-      return
-    }
+    try {
+      const { coords, precision } = await obtenerPosicionActual()
 
-    navigator.geolocation.getCurrentPosition(
-      (posicion) => {
-        const ubicacion = [
-          posicion.coords.latitude,
-          posicion.coords.longitude
-        ]
-        setUbicacionUsuario(ubicacion)
-        setObteniendoUbicacion(false)
-      },
-      (err) => {
-        console.error(err)
-        setErrorRuta(
-          'No se pudo obtener tu ubicación. Activa el GPS o permite el acceso a la ubicación.'
-        )
-        setObteniendoUbicacion(false)
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
-      }
-    )
+      setUbicacionUsuario(coords)
+      setPrecisionUbicacion(precision)
+      mapa?.flyTo(coords, 16, { duration: 1 })
+    } catch (err) {
+      setErrorRuta(err.message)
+    } finally {
+      setObteniendoUbicacion(false)
+    }
   }
 
 
   // =======================================================
-  // CALCULAR RUTA MÁS RÁPIDA
+  // CÓMO LLEGAR: RUTA DESDE MI UBICACIÓN HASTA EL PUNTO
   // =======================================================
 
-  const calcularRuta = async (punto) => {
+  const calcularRuta = async (punto, modo = modoRuta, origenConocido = null) => {
     setErrorRuta('')
-
-    if (!navigator.geolocation) {
-      setErrorRuta('Tu navegador no permite obtener tu ubicación.')
-      return
-    }
-
     setPuntoRuta(punto)
     setCargandoRuta(true)
 
-    navigator.geolocation.getCurrentPosition(
-      async (posicion) => {
-        try {
-          const origen = [
-            posicion.coords.longitude,
-            posicion.coords.latitude
-          ]
+    try {
+      let origen = origenConocido
 
-          const destino = [punto.longitud, punto.latitud]
-
-          setUbicacionUsuario([
-            posicion.coords.latitude,
-            posicion.coords.longitude
-          ])
-
-          const url =
-            `https://router.project-osrm.org/route/v1/driving/` +
-            `${origen[0]},${origen[1]};` +
-            `${destino[0]},${destino[1]}` +
-            `?overview=full&geometries=geojson&steps=true`
-
-          const respuesta = await fetch(url)
-
-          if (!respuesta.ok) {
-            throw new Error('No se pudo calcular la ruta')
-          }
-
-          const datos = await respuesta.json()
-
-          if (!datos.routes || datos.routes.length === 0) {
-            throw new Error('No se encontró una ruta')
-          }
-
-          const rutaPrincipal = datos.routes[0]
-
-          setRuta({
-            coordinates: rutaPrincipal.geometry.coordinates,
-            distancia: rutaPrincipal.distance,
-            duracion: rutaPrincipal.duration
-          })
-        } catch (err) {
-          console.error(err)
-          setErrorRuta('No se pudo calcular la ruta hasta este punto.')
-          setRuta(null)
-        } finally {
-          setCargandoRuta(false)
-        }
-      },
-      (err) => {
-        console.error(err)
-        setErrorRuta(
-          'No se pudo obtener tu ubicación. Activa el GPS o permite el acceso a la ubicación.'
-        )
-        setCargandoRuta(false)
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
+      if (!origen) {
+        const { coords, precision } = await obtenerPosicionActual()
+        origen = coords
+        setUbicacionUsuario(coords)
+        setPrecisionUbicacion(precision)
       }
-    )
+
+      const nuevaRuta = await consultarRuta(
+        origen,
+        [punto.latitud, punto.longitud],
+        modo
+      )
+
+      setOrigenRuta(origen)
+      setModoRuta(modo)
+      setRuta(nuevaRuta)
+
+      // Cerrar el popup y encuadrar la ruta completa
+      mapa?.closePopup()
+      mapa?.fitBounds(L.latLngBounds([origen, ...nuevaRuta.coordenadas]), {
+        padding: [60, 60],
+        maxZoom: 17
+      })
+    } catch (err) {
+      setErrorRuta(err.message)
+      setRuta(null)
+    } finally {
+      setCargandoRuta(false)
+    }
+  }
+
+  // Recalcula la misma ruta en carro o a pie, sin volver a pedir la ubicación
+  const cambiarModoRuta = (modo) => {
+    if (modo === modoRuta || !puntoRuta || !origenRuta || cargandoRuta) return
+    calcularRuta(puntoRuta, modo, origenRuta)
   }
 
 
@@ -559,7 +547,149 @@ function Mapa() {
   const limpiarRuta = () => {
     setRuta(null)
     setPuntoRuta(null)
+    setOrigenRuta(null)
     setErrorRuta('')
+  }
+
+
+  // =======================================================
+  // UBICAR EL PUNTO NUEVO
+  // =======================================================
+
+  // Fija la ubicación del punto si está dentro de Ciudad Bolívar.
+  // Devuelve false si queda por fuera (cada llamada muestra su aviso).
+  const fijarUbicacionPunto = async (coords, { direccion, mover = true } = {}) => {
+    if (!limiteCiudadBolivar || !estaEnCiudadBolivar(coords, limiteCiudadBolivar)) {
+      return false
+    }
+
+    setAvisoSeleccion('')
+    setResultadosDireccion([])
+    setUbicacionSeleccionada(coords)
+    setSeleccionando(false)
+    setMostrarFormulario(true)
+    setError('')
+    setMensaje('')
+
+    if (mover) {
+      mapa?.flyTo(coords, 17, { duration: 1 })
+    }
+
+    // Prellenar la dirección sin pisar lo que el usuario escribió a mano
+    if (!direccionEditada.current) {
+      const sugerida = direccion ?? (await direccionDeCoordenadas(coords))
+
+      if (sugerida && !direccionEditada.current) {
+        setFormulario((prev) => ({ ...prev, direccion: sugerida }))
+      }
+    }
+
+    return true
+  }
+
+  const usarMiUbicacionParaPunto = async () => {
+    setAvisoSeleccion('')
+    setResultadosDireccion([])
+    setUbicandoPunto(true)
+
+    try {
+      const { coords, precision } = await obtenerPosicionActual()
+
+      setUbicacionUsuario(coords)
+      setPrecisionUbicacion(precision)
+
+      const dentro = await fijarUbicacionPunto(coords)
+
+      if (!dentro) {
+        mapa?.flyTo(coords, 14, { duration: 1 })
+        setAvisoSeleccion(
+          'Tu ubicación actual está fuera de Ciudad Bolívar. Busca una dirección o haz clic dentro de la localidad.'
+        )
+        return
+      }
+
+      setNotaUbicacion(
+        precision > 50
+          ? `Ubicación aproximada (±${precision} m). Arrastra el marcador naranja si no está en el sitio exacto.`
+          : 'Usamos tu ubicación actual. Puedes arrastrar el marcador naranja para ajustarla.'
+      )
+    } catch (err) {
+      setAvisoSeleccion(err.message)
+    } finally {
+      setUbicandoPunto(false)
+    }
+  }
+
+  const elegirResultadoDireccion = async (resultado) => {
+    await fijarUbicacionPunto(resultado.coords, { direccion: textoDireccion.trim() })
+
+    setNotaUbicacion(
+      resultado.aproximada
+        ? 'Ubicamos la vía, no la placa exacta. Arrastra el marcador naranja hasta el sitio.'
+        : 'Revisa que el marcador naranja quede en el sitio correcto; puedes arrastrarlo.'
+    )
+  }
+
+  const buscarDireccionPunto = async (e) => {
+    e.preventDefault()
+
+    const texto = textoDireccion.trim()
+
+    if (texto.length < 4) {
+      setAvisoSeleccion('Escribe una dirección más completa, por ejemplo "Calle 70 Sur # 18M-50".')
+      return
+    }
+
+    setBuscandoDireccion(true)
+    setAvisoSeleccion('')
+    setResultadosDireccion([])
+
+    try {
+      const resultados = await buscarDireccion(texto, limiteCiudadBolivar)
+
+      if (resultados.length === 0) {
+        setAvisoSeleccion(
+          'No encontramos esa dirección dentro de Ciudad Bolívar. Prueba solo con la vía (ej. "Calle 70 Sur") o haz clic en el mapa.'
+        )
+      } else if (resultados.length === 1) {
+        await elegirResultadoDireccion(resultados[0])
+      } else {
+        setResultadosDireccion(resultados)
+      }
+    } catch (err) {
+      setAvisoSeleccion(err.message)
+    } finally {
+      setBuscandoDireccion(false)
+    }
+  }
+
+  const seleccionarEnMapa = async (coords) => {
+    const dentro = await fijarUbicacionPunto(coords, { mover: false })
+
+    if (!dentro) {
+      setAvisoSeleccion(
+        'Esa ubicación está fuera de Ciudad Bolívar. Haz clic dentro del área verde.'
+      )
+      return
+    }
+
+    setNotaUbicacion('Puedes arrastrar el marcador naranja para ajustar la ubicación.')
+  }
+
+  // Al soltar el marcador arrastrable
+  const moverMarcadorPunto = async (evento) => {
+    const marcador = evento.target
+    const { lat, lng } = marcador.getLatLng()
+
+    const dentro = await fijarUbicacionPunto([lat, lng], { mover: false })
+
+    if (!dentro) {
+      marcador.setLatLng(ubicacionSeleccionada)
+      setError('El punto debe quedar dentro de Ciudad Bolívar.')
+      return
+    }
+
+    setNotaUbicacion('Ubicación ajustada a mano.')
   }
 
 
@@ -594,6 +724,7 @@ function Mapa() {
 
   const manejarCambioFormulario = (e) => {
     const { name, value } = e.target
+    if (name === 'direccion') direccionEditada.current = value.trim() !== ''
     setFormulario({
       ...formulario,
       [name]: value
@@ -624,12 +755,20 @@ function Mapa() {
     setMostrarFormulario(false)
     setMensaje('')
     setError('')
+    setAvisoSeleccion('')
+    setResultadosDireccion([])
+    setNotaUbicacion('')
   }
 
   const cancelarSeleccion = () => {
     setSeleccionando(false)
     setUbicacionSeleccionada(null)
     setMostrarFormulario(false)
+    setAvisoSeleccion('')
+    setResultadosDireccion([])
+    setNotaUbicacion('')
+    setTextoDireccion('')
+    direccionEditada.current = false
     setFormulario({
       nombre: '',
       descripcion: '',
@@ -639,14 +778,6 @@ function Mapa() {
     })
     setMensaje('')
     setError('')
-  }
-
-  const manejarUbicacion = (ubicacion) => {
-    setUbicacionSeleccionada(ubicacion)
-    setSeleccionando(false)
-    setMostrarFormulario(true)
-    setError('')
-    setMensaje('')
   }
 
 
@@ -730,6 +861,9 @@ const crearPunto = async (e) => {
 
     setUbicacionSeleccionada(null)
     setMostrarFormulario(false)
+    setNotaUbicacion('')
+    setTextoDireccion('')
+    direccionEditada.current = false
 
     const respuestaPuntos = await fetch('http://127.0.0.1:8000/puntos')
 
@@ -1131,12 +1265,88 @@ const registrarEntrega = async (e) => {
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="p-4 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/30 rounded-2xl text-xs font-bold text-[#218739] dark:text-[#2fa350] flex items-center gap-3 shadow-2xs"
+              className="p-5 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/30 rounded-2xl shadow-2xs space-y-4"
             >
-              <span className="text-lg">📍</span>
-              <span>
-                Haz clic sobre la ubicación deseada dentro de Ciudad Bolívar en el mapa para marcar el nuevo punto ecológico.
-              </span>
+              <p className="text-sm font-extrabold text-[#218739] dark:text-[#2fa350]">
+                📍 ¿Dónde está el nuevo punto ecológico?
+              </p>
+
+              <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-4 items-start">
+                {/* OPCIÓN 1: MI UBICACIÓN */}
+                <button
+                  type="button"
+                  onClick={usarMiUbicacionParaPunto}
+                  disabled={ubicandoPunto}
+                  className="px-4 py-3 bg-[#1976d2] hover:bg-[#1565c0] disabled:opacity-60 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap"
+                >
+                  {ubicandoPunto ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                      Obteniendo tu ubicación...
+                    </>
+                  ) : (
+                    <>🎯 Usar mi ubicación actual</>
+                  )}
+                </button>
+
+                {/* OPCIÓN 2: BUSCAR UNA DIRECCIÓN */}
+                <form onSubmit={buscarDireccionPunto} className="flex gap-2" role="search">
+                  <label htmlFor="buscar-direccion" className="sr-only">
+                    Buscar una dirección
+                  </label>
+                  <input
+                    id="buscar-direccion"
+                    type="text"
+                    value={textoDireccion}
+                    onChange={(e) => {
+                      setTextoDireccion(e.target.value)
+                      setAvisoSeleccion('')
+                    }}
+                    placeholder='O escribe una dirección: "Calle 70 Sur # 18M-50"'
+                    className="flex-1 min-w-0 px-4 py-3 text-xs rounded-xl bg-white dark:bg-[#0f1512] text-gray-900 dark:text-white border border-emerald-200 dark:border-emerald-900/40 focus:outline-hidden focus:border-[#218739] dark:focus:border-[#2fa350]"
+                  />
+                  <button
+                    type="submit"
+                    disabled={buscandoDireccion}
+                    className="px-4 py-3 bg-[#218739] hover:bg-[#176b2b] disabled:opacity-60 text-white text-xs font-bold rounded-xl cursor-pointer whitespace-nowrap"
+                  >
+                    {buscandoDireccion ? 'Buscando...' : '🔎 Buscar'}
+                  </button>
+                </form>
+              </div>
+
+              {/* RESULTADOS DE LA BÚSQUEDA */}
+              {resultadosDireccion.length > 0 && (
+                <div>
+                  <p className="text-[11px] font-bold text-gray-600 dark:text-[#a8b3ae] mb-2">
+                    Encontramos varias coincidencias, elige la correcta:
+                  </p>
+                  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {resultadosDireccion.map((resultado) => (
+                      <li key={resultado.coords.join(',')}>
+                        <button
+                          type="button"
+                          onClick={() => elegirResultadoDireccion(resultado)}
+                          className="w-full text-left px-3 py-2.5 rounded-xl bg-white dark:bg-[#0f1512] border border-emerald-200 dark:border-emerald-900/40 hover:border-[#218739] text-xs font-semibold text-gray-800 dark:text-[#f2f5f3] cursor-pointer"
+                        >
+                          📍 {resultado.etiqueta}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {avisoSeleccion && (
+                <p className="text-xs font-bold text-[#d93025] dark:text-[#ef5350] bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 rounded-xl px-3 py-2">
+                  ⚠️ {avisoSeleccion}
+                </p>
+              )}
+
+              {/* OPCIÓN 3: CLIC EN EL MAPA */}
+              <p className="text-[11px] font-semibold text-gray-600 dark:text-[#a8b3ae]">
+                🖱️ También puedes hacer clic directamente sobre el mapa, dentro del área verde de Ciudad Bolívar.
+              </p>
             </motion.div>
           )}
         </AnimatePresence>
@@ -1156,19 +1366,61 @@ const registrarEntrega = async (e) => {
             >
               <div>
                 <span className="font-bold block text-sm">
-                  📍 Coordenadas marcadas
+                  📍 Ubicación del nuevo punto
                 </span>
                 <span className="font-mono text-[11px] mt-0.5 block">
                   Lat: {ubicacionSeleccionada[0].toFixed(6)} | Lng:{' '}
                   {ubicacionSeleccionada[1].toFixed(6)}
                 </span>
+                {notaUbicacion && (
+                  <span className="text-[11px] font-semibold mt-1 block">
+                    {notaUbicacion}
+                  </span>
+                )}
               </div>
 
+              <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={iniciarSeleccion}
+                  className="px-3 py-1.5 bg-white dark:bg-transparent border border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 font-bold rounded-lg text-xs cursor-pointer"
+                >
+                  Cambiar ubicación
+                </button>
+
+                {!mostrarFormulario && (
+                  <button
+                    type="button"
+                    onClick={() => setMostrarFormulario(true)}
+                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs cursor-pointer shadow-2xs"
+                  >
+                    Completar datos
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+
+        {/* CONFIRMACIÓN DESPUÉS DE ENVIAR (el formulario ya se ocultó) */}
+        <AnimatePresence>
+          {mensaje && !mostrarFormulario && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              role="status"
+              className="p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/30 rounded-2xl text-xs font-bold text-[#218739] dark:text-[#2fa350] flex items-center justify-between gap-4 shadow-2xs"
+            >
+              <span>🎉 {mensaje}</span>
               <button
-                onClick={() => setMostrarFormulario(true)}
-                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs cursor-pointer shadow-2xs"
+                type="button"
+                onClick={() => setMensaje('')}
+                className="text-[#218739] dark:text-[#2fa350] hover:opacity-70 cursor-pointer"
+                aria-label="Cerrar mensaje"
               >
-                Completar datos
+                ✕
               </button>
             </motion.div>
           )}
@@ -1362,6 +1614,7 @@ const registrarEntrega = async (e) => {
           )}
 
           <MapContainer
+            ref={setMapa}
             center={centroCiudadBolivar}
             zoom={13}
             minZoom={12}
@@ -1379,12 +1632,8 @@ const registrarEntrega = async (e) => {
             {/* SELECTOR DE UBICACIÓN */}
             <SelectorUbicacion
               seleccionando={seleccionando}
-              setUbicacion={manejarUbicacion}
-              limiteCiudadBolivar={limiteCiudadBolivar}
+              onSeleccionar={seleccionarEnMapa}
             />
-
-            {/* CONTROL DE VISTA */}
-            <ControlVistaMapa ubicacion={ubicacionSeleccionada} />
 
             {/* LÍMITE CIUDAD BOLÍVAR */}
             {limiteCiudadBolivar && (
@@ -1394,16 +1643,48 @@ const registrarEntrega = async (e) => {
               />
             )}
 
-            {/* UBICACIÓN USUARIO */}
+            {/* RUTA: borde blanco debajo para que se lea sobre cualquier capa */}
+            {ruta && (
+              <>
+                <Polyline
+                  positions={ruta.coordenadas}
+                  pathOptions={{ color: '#ffffff', weight: 9, opacity: 0.9, lineCap: 'round', lineJoin: 'round' }}
+                />
+                <Polyline
+                  positions={ruta.coordenadas}
+                  pathOptions={{
+                    color: MODOS_RUTA[modoRuta].color,
+                    weight: 5,
+                    opacity: 0.95,
+                    dashArray: MODOS_RUTA[modoRuta].trazo,
+                    lineCap: 'round',
+                    lineJoin: 'round'
+                  }}
+                />
+              </>
+            )}
+
+            {/* UBICACIÓN USUARIO (con su margen de error) */}
+            {ubicacionUsuario && precisionUbicacion > 30 && (
+              <Circle
+                center={ubicacionUsuario}
+                radius={precisionUbicacion}
+                pathOptions={{ color: '#1976d2', weight: 1, fillColor: '#1976d2', fillOpacity: 0.08 }}
+                interactive={false}
+              />
+            )}
+
             {ubicacionUsuario && (
-              <Marker position={ubicacionUsuario} icon={iconoUsuario}>
+              <Marker position={ubicacionUsuario} icon={iconoUsuario} zIndexOffset={500}>
                 <Popup>
                   <div className="p-1 text-xs font-sans">
                     <strong className="text-blue-600 block mb-1">
                       📍 Tu ubicación
                     </strong>
                     <span className="text-gray-600">
-                      Esta es tu ubicación actual.
+                      {precisionUbicacion
+                        ? `Precisión aproximada: ±${precisionUbicacion} m`
+                        : 'Esta es tu ubicación actual.'}
                     </span>
                   </div>
                 </Popup>
@@ -1507,7 +1788,13 @@ const registrarEntrega = async (e) => {
 
 {/* UBICACIÓN NUEVA */}
 {ubicacionSeleccionada && (
-  <Marker position={ubicacionSeleccionada}>
+  <Marker
+    position={ubicacionSeleccionada}
+    icon={iconoNuevoPunto}
+    draggable
+    zIndexOffset={1000}
+    eventHandlers={{ dragend: moverMarcadorPunto }}
+  >
     <Popup>
       <div className="p-1 font-sans text-xs">
         <strong className="text-[#218739] block mb-1">
@@ -1515,7 +1802,7 @@ const registrarEntrega = async (e) => {
         </strong>
 
         <span>
-          Completa los datos en el panel superior para enviarlo a moderación.
+          Arrástrame para ajustar el sitio y completa los datos en el panel superior.
         </span>
       </div>
     </Popup>
@@ -2160,14 +2447,14 @@ const registrarEntrega = async (e) => {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xl">🚗</span>
+                      <span className="text-xl">{MODOS_RUTA[modoRuta].icono}</span>
                       <h3 className="font-black text-sm text-gray-900 dark:text-white">
-                        Ruta más rápida
+                        Ruta {MODOS_RUTA[modoRuta].nombre.toLowerCase()}
                       </h3>
                     </div>
 
                     <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-2">
-                      Hacia:{' '}
+                      Desde tu ubicación hasta{' '}
                       <strong className="text-gray-800 dark:text-gray-200">
                         {puntoRuta.nombre}
                       </strong>
@@ -2177,13 +2464,34 @@ const registrarEntrega = async (e) => {
                   <button
                     type="button"
                     onClick={limpiarRuta}
-                    className="text-gray-400 hover:text-red-500 text-lg"
+                    className="text-gray-400 hover:text-red-500 text-lg cursor-pointer"
+                    aria-label="Cerrar la ruta"
                   >
                     ✕
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 mt-4">
+                {/* CARRO / A PIE */}
+                <div className="grid grid-cols-2 gap-1 mt-3 p-1 rounded-xl bg-gray-100 dark:bg-[#121816]" role="group" aria-label="Modo de transporte">
+                  {Object.entries(MODOS_RUTA).map(([id, modo]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => cambiarModoRuta(id)}
+                      disabled={cargandoRuta}
+                      aria-pressed={modoRuta === id}
+                      className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer disabled:cursor-wait ${
+                        modoRuta === id
+                          ? 'bg-white dark:bg-[#1a2320] text-gray-900 dark:text-white shadow-xs'
+                          : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+                      }`}
+                    >
+                      {modo.icono} {modo.nombre}
+                    </button>
+                  ))}
+                </div>
+
+                <div className={`grid grid-cols-2 gap-2 mt-3 transition-opacity ${cargandoRuta ? 'opacity-50' : ''}`}>
                   <div className="bg-gray-50 dark:bg-[#121816] rounded-xl p-3">
                     <span className="block text-[10px] text-gray-400 uppercase font-bold">
                       📏 Distancia
@@ -2205,10 +2513,21 @@ const registrarEntrega = async (e) => {
                   </div>
                 </div>
 
+                {origenRuta && (
+                  <a
+                    href={enlaceGoogleMaps(origenRuta, [puntoRuta.latitud, puntoRuta.longitud], modoRuta)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block w-full mt-3 py-2 text-center bg-[#1976d2] hover:bg-[#1565c0] text-white rounded-xl text-xs font-bold transition-all"
+                  >
+                    🧭 Navegar paso a paso en Google Maps
+                  </a>
+                )}
+
                 <button
                   type="button"
                   onClick={limpiarRuta}
-                  className="w-full mt-3 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl text-xs font-bold transition-all"
+                  className="w-full mt-2 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
                 >
                   ✕ Limpiar ruta
                 </button>
