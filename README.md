@@ -102,8 +102,17 @@ npm run dev
 - **Autenticación**: registro (`/usuarios/registro`), login (`/usuarios/login`) con JWT y recuperación de contraseña vía código enviado por correo.
 - **Usuarios**: listar, ver perfil propio (`/usuarios/me`), actualizar datos y eliminar cuentas.
 - **Puntos ecológicos**: registrar puntos (con opción de URL de foto y fecha de creación), listar aprobados, listar puntos propios e historial.
-- **Panel administrativo**: listar usuarios y cambiar permisos de administrador, listar puntos pendientes, aprobar y rechazar puntos (con motivo de rechazo).
-- **Entregas/Donaciones**: registrar entregas en puntos aprobados y consultar historial de entregas.
+- **Panel administrativo**: listar usuarios y cambiar permisos de administrador, listar puntos pendientes, aprobar y rechazar puntos (con motivo de rechazo), verificar o rechazar entregas y quitar la marca de revisión prioritaria de un punto.
+- **Entregas/Donaciones (HU-20)**: registrar entregas en puntos aprobados con categoría, artículo, cantidad, peso en kg, estado de conservación y foto (URL). Cada entrega queda `pendiente` hasta que un administrador la marca `verificada` o `rechazada` (con motivo). El historial (`/historial`) se filtra por estado y muestra el detalle de cada entrega.
+- **Dashboard de impacto (HU-22)**: `/impacto` muestra los kg reciclados, el número de entregas, los puntos activos y los vecinos participantes, con filtro por categoría (`GET /impacto?categoria=...`). Los administradores ven además usuarios activos, puntos por revisar, entregas por verificar y reportes abiertos.
+- **Reseñas (HU-23)**: calificación de 1 a 5 estrellas con comentario opcional (`GET/PUT/DELETE /puntos/:id/resenas`). Cada usuario tiene una sola reseña por punto y al volver a calificar la edita. El punto guarda su promedio y total; si recibe muchas reseñas negativas recientes queda marcado para revisión prioritaria.
+
+### Variables opcionales de reseñas
+
+| Variable | Por defecto | Qué hace |
+|---|---|---|
+| `UMBRAL_RESENAS_NEGATIVAS` | `3` | Reseñas de 1 o 2 estrellas que marcan un punto para revisión prioritaria |
+| `DIAS_RESENAS_RECIENTES` | `30` | Ventana de días en la que se cuentan esas reseñas |
 
 ### Convertir un usuario en administrador
 
@@ -119,4 +128,5 @@ docker exec -it eco_trace_db psql -U eco_trace -d eco_trace -c "UPDATE usuarios 
 
 ## 🔜 Pendiente
 
-- Mantenimiento y optimización del módulo de historial e impacto
+- Tabla `NOTIFICACION` del MER (registro de las notificaciones enviadas)
+- Los documentos piden Resend para los correos; el backend usa SMTP (nodemailer)

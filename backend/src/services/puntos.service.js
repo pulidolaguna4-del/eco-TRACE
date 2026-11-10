@@ -105,7 +105,26 @@ export const aprobar = (puntoId) => cambiarEstado(puntoId, 'aprobado')
 export const rechazar = (puntoId, motivoRechazo) =>
   cambiarEstado(puntoId, 'rechazado', motivoRechazo)
 
-// Elimina el punto con sus reportes, entregas y categorías
+// Quita la marca de revisión prioritaria (HU-23). Las reseñas
+// negativas anteriores a esta fecha ya no vuelven a marcar el punto.
+export async function marcarRevisado(puntoId) {
+  const punto = await prisma.punto.findUnique({ where: { id: puntoId } })
+  if (!punto) {
+    throw new HttpError(404, 'Punto no encontrado')
+  }
+
+  return prisma.punto.update({
+    where: { id: puntoId },
+    data: {
+      revision_prioritaria: false,
+      motivo_revision: null,
+      fecha_revision: new Date()
+    },
+    include: CON_CATEGORIAS
+  })
+}
+
+// Elimina el punto con sus reseñas, reportes, entregas y categorías
 export async function eliminar(puntoId) {
   const punto = await prisma.punto.findUnique({ where: { id: puntoId } })
   if (!punto) {
@@ -113,6 +132,7 @@ export async function eliminar(puntoId) {
   }
 
   await prisma.$transaction([
+    prisma.resena.deleteMany({ where: { punto_id: puntoId } }),
     prisma.reporte.deleteMany({ where: { punto_id: puntoId } }),
     prisma.entrega.deleteMany({ where: { punto_id: puntoId } }),
     prisma.puntoCategoria.deleteMany({ where: { punto_id: puntoId } }),

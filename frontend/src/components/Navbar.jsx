@@ -34,7 +34,9 @@ function Navbar() {
       <div className="hidden md:flex items-center gap-6 text-sm font-semibold text-gray-600 dark:text-[#a8b3ae]">
         <Link to="/home" className="hover:text-[#218739] dark:hover:text-[#2fa350] transition-colors duration-150">Inicio</Link>
         <Link to="/mapa" className="hover:text-[#218739] dark:hover:text-[#2fa350] transition-colors duration-150">Mapa</Link>
+        <Link to="/impacto" className="hover:text-[#218739] dark:hover:text-[#2fa350] transition-colors duration-150">Impacto</Link>
         <Link to="/mis-puntos" className="hover:text-[#218739] dark:hover:text-[#2fa350] transition-colors duration-150">Mis puntos</Link>
+        <Link to="/historial" className="hover:text-[#218739] dark:hover:text-[#2fa350] transition-colors duration-150">Mis entregas</Link>
         <Link to="/perfil" className="hover:text-[#218739] dark:hover:text-[#2fa350] transition-colors duration-150">Mi perfil</Link>
 
         {/* Solo aparece si el usuario es administrador */}

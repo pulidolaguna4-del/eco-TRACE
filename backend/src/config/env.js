@@ -29,6 +29,14 @@ export const config = {
     algorithm: 'HS256'
   },
 
+  // HU-23: un punto se marca para revisión prioritaria cuando recibe
+  // `umbralNegativas` reseñas de 1 o 2 estrellas en los últimos `diasRecientes` días
+  resenas: {
+    umbralNegativas: Number(process.env.UMBRAL_RESENAS_NEGATIVAS ?? 3),
+    diasRecientes: Number(process.env.DIAS_RESENAS_RECIENTES ?? 30),
+    puntuacionNegativa: 2
+  },
+
   email: {
     host: process.env.EMAIL_HOST ?? 'smtp.gmail.com',
     port: Number(process.env.EMAIL_PORT ?? 587),

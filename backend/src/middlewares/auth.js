@@ -36,6 +36,19 @@ export async function requireAuth(req, _res, next) {
   next()
 }
 
+// Para rutas públicas que muestran más datos a usuarios autenticados.
+// Sin token, o con un token inválido, sigue como visitante anónimo.
+export async function optionalAuth(req, res, next) {
+  if (!req.headers.authorization) return next()
+
+  try {
+    await requireAuth(req, res, () => {})
+  } catch {
+    req.usuario = undefined
+  }
+  next()
+}
+
 export function requireAdmin(req, _res, next) {
   if (!req.usuario?.es_admin) {
     throw new HttpError(403, 'No tienes permisos de administrador')

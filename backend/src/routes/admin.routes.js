@@ -4,6 +4,7 @@ import * as ctrl from '../controllers/admin.controller.js'
 import { requireAdmin, requireAuth } from '../middlewares/auth.js'
 import { validate } from '../middlewares/validate.js'
 import { idParam } from '../validators/comunes.js'
+import { revisionEntregaSchema } from '../validators/entregas.schemas.js'
 import { rechazoPuntoSchema } from '../validators/puntos.schemas.js'
 import { revisionReporteSchema } from '../validators/reportes.schemas.js'
 
@@ -15,6 +16,7 @@ router.use(requireAuth, requireAdmin)
 const usuarioId = validate({ params: idParam('usuario_id') })
 const puntoId = validate({ params: idParam('punto_id') })
 const reporteId = validate({ params: idParam('reporte_id') })
+const entregaId = validate({ params: idParam('entrega_id') })
 
 // Usuarios
 router.get('/usuarios', ctrl.listarUsuarios)
@@ -26,10 +28,12 @@ router.get('/puntos', ctrl.listarPuntos)
 router.get('/puntos/pendientes', ctrl.listarPuntosPendientes)
 router.put('/puntos/:punto_id/aprobar', puntoId, ctrl.aprobarPunto)
 router.put('/puntos/:punto_id/rechazar', puntoId, validate({ body: rechazoPuntoSchema }), ctrl.rechazarPunto)
+router.put('/puntos/:punto_id/revision', puntoId, ctrl.marcarPuntoRevisado)
 router.delete('/puntos/:punto_id', puntoId, ctrl.eliminarPunto)
 
 // Entregas
 router.get('/entregas', ctrl.listarEntregas)
+router.put('/entregas/:entrega_id/revisar', entregaId, validate({ body: revisionEntregaSchema }), ctrl.revisarEntrega)
 
 // Reportes
 router.get('/reportes', ctrl.listarReportes)

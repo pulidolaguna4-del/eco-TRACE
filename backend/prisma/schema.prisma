@@ -25,6 +25,7 @@ model Usuario {
   puntos               Punto[]
   entregas             Entrega[]
   reportes             Reporte[]
+  resenas              Resena[]
   codigos_recuperacion CodigoRecuperacion[]
 
   @@map("usuarios")
@@ -34,7 +35,8 @@ model Categoria {
   id     Int    @id @default(autoincrement())
   nombre String @unique @db.VarChar
 
-  puntos PuntoCategoria[]
+  puntos   PuntoCategoria[]
+  entregas Entrega[]
 
   @@map("categorias")
 }
@@ -64,28 +66,70 @@ model Punto {
   motivo_rechazo String?  @db.VarChar
   usuario_id     Int
 
+  // Reseñas (HU-23): se recalculan cada vez que se guarda o borra una
+  calificacion_promedio Float     @default(0)
+  total_resenas         Int       @default(0)
+  // Se activa al superar el umbral de reseñas negativas recientes
+  revision_prioritaria  Boolean   @default(false)
+  motivo_revision       String?   @db.VarChar(255)
+  // Última vez que un administrador revisó el punto marcado
+  fecha_revision        DateTime? @db.Timestamp(6)
+
   usuario    Usuario          @relation(fields: [usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   categorias PuntoCategoria[]
   entregas   Entrega[]
   reportes   Reporte[]
+  resenas    Resena[]
 
   @@map("puntos")
 }
 
-model Entrega {
-  id          Int      @id @default(autoincrement())
-  usuario_id  Int
-  punto_id    Int
-  tipo        String   @db.VarChar
-  cantidad    Float
-  unidad      String   @db.VarChar
-  fecha       DateTime @default(now()) @db.Timestamp(6)
-  estado      String   @default("registrada") @db.VarChar
-  observacion String?  @db.VarChar
+// Una reseña por usuario y punto: si vuelve a calificar, se edita la suya
+model Resena {
+  id                  Int      @id @default(autoincrement())
+  usuario_id          Int
+  punto_id            Int
+  // 1 a 5 estrellas
+  puntuacion          Int
+  comentario          String?  @db.VarChar(500)
+  fecha               DateTime @default(now()) @db.Timestamp(6)
+  fecha_actualizacion DateTime @default(now()) @updatedAt @db.Timestamp(6)
 
   usuario Usuario @relation(fields: [usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   punto   Punto   @relation(fields: [punto_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
+  @@unique([usuario_id, punto_id], map: "uq_resenas_usuario_punto")
+  @@index([punto_id], map: "ix_resenas_punto_id")
+  @@map("resenas")
+}
+
+// Estados: pendiente -> verificada | rechazada (los revisa el administrador)
+model Entrega {
+  id                  Int      @id @default(autoincrement())
+  usuario_id          Int
+  punto_id            Int
+  // Categoría del material entregado (una de las categorías del punto)
+  categoria_id        Int?
+  tipo                String   @db.VarChar
+  nombre_articulo     String?  @db.VarChar(120)
+  cantidad            Float
+  unidad              String   @db.VarChar
+  // Peso en kilogramos. Si la unidad es "kg" coincide con la cantidad.
+  peso                Float?
+  // nuevo | bueno | regular | danado (ropa y electrónicos)
+  estado_conservacion String?  @db.VarChar(20)
+  foto_url            String?  @db.VarChar
+  fecha               DateTime @default(now()) @db.Timestamp(6)
+  estado              String   @default("pendiente") @db.VarChar
+  observacion         String?  @db.VarChar
+  observacion_admin   String?  @db.VarChar(500)
+
+  usuario   Usuario    @relation(fields: [usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  punto     Punto      @relation(fields: [punto_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  categoria Categoria? @relation(fields: [categoria_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([categoria_id], map: "ix_entregas_categoria_id")
+  @@index([estado], map: "ix_entregas_estado")
   @@map("entregas")
 }
 

@@ -5,6 +5,7 @@
 import { prisma } from '../config/prisma.js'
 import { HttpError } from '../utils/HttpError.js'
 import { hashPassword, verificarPassword } from '../utils/password.js'
+import { recalcular as recalcularCalificacion } from './resenas.service.js'
 
 export function listar() {
   return prisma.usuario.findMany({ orderBy: { id: 'asc' } })
@@ -71,7 +72,7 @@ export async function alternarAdmin(usuarioId, adminId) {
   })
 }
 
-// Elimina el usuario junto con sus puntos, entregas, reportes y códigos
+// Elimina el usuario junto con sus puntos, entregas, reportes, reseñas y códigos
 export async function eliminarConDatos(usuarioId, adminId) {
   const usuario = await obtenerOtroUsuario(
     usuarioId,
@@ -90,8 +91,15 @@ export async function eliminarConDatos(usuarioId, adminId) {
     OR: [{ usuario_id: usuario.id }, { punto_id: { in: puntosIds } }]
   }
 
+  // Puntos de otros usuarios que este calificó: hay que recalcular su promedio
+  const calificados = await prisma.resena.findMany({
+    where: { usuario_id: usuario.id, punto_id: { notIn: puntosIds } },
+    select: { punto_id: true }
+  })
+
   try {
     await prisma.$transaction([
+      prisma.resena.deleteMany({ where: delUsuarioOSusPuntos }),
       prisma.reporte.deleteMany({ where: delUsuarioOSusPuntos }),
       prisma.entrega.deleteMany({ where: delUsuarioOSusPuntos }),
       prisma.puntoCategoria.deleteMany({ where: { punto_id: { in: puntosIds } } }),
@@ -102,6 +110,10 @@ export async function eliminarConDatos(usuarioId, adminId) {
   } catch (error) {
     console.error('ERROR AL ELIMINAR USUARIO:', error)
     throw new HttpError(500, 'No se pudo eliminar el usuario y sus datos relacionados')
+  }
+
+  for (const { punto_id } of calificados) {
+    await recalcularCalificacion(punto_id)
   }
 
   return { mensaje: 'Usuario y sus datos relacionados eliminados correctamente' }

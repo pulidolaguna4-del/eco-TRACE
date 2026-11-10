@@ -20,10 +20,13 @@ import 'leaflet/dist/leaflet.css'
 import {
   normalizarPunto,
   CATEGORIAS_DISPONIBLES,
+  ESTADOS_CONSERVACION,
   obtenerIconoYColorPorCategorias,
-  formatearMensajeError
+  formatearMensajeError,
+  tipoDeCategoria
 } from '../utils/puntoUtils'
 import { CategoriasBadges } from '../components/CategoriasBadges'
+import ResenasPunto, { Estrellas } from '../components/ResenasPunto'
 
 
 // =========================================================
@@ -155,6 +158,33 @@ const iconoUsuario = L.divIcon({
 
 
 // =========================================================
+// FORMULARIO DE ENTREGA
+// =========================================================
+
+// La unidad sugerida depende del tipo de material
+function unidadPorDefecto(tipo) {
+  if (tipo === 'ropa') return 'prendas'
+  if (tipo === 'electronicos') return 'unidades'
+  return 'kg'
+}
+
+function formularioEntregaVacio(categoria = '') {
+  const tipo = tipoDeCategoria(categoria)
+
+  return {
+    categoria,
+    tipo,
+    nombre_articulo: '',
+    cantidad: '',
+    unidad: unidadPorDefecto(tipo),
+    peso: '',
+    estado_conservacion: '',
+    foto_url: ''
+  }
+}
+
+
+// =========================================================
 // MAPA
 // =========================================================
 
@@ -189,11 +219,9 @@ function Mapa() {
 
   const [mostrarEntrega, setMostrarEntrega] = useState(false)
 
-  const [formularioEntrega, setFormularioEntrega] = useState({
-    tipo: 'reciclaje',
-    cantidad: '',
-    unidad: 'kg'
-  })
+  const [formularioEntrega, setFormularioEntrega] = useState(
+    formularioEntregaVacio()
+  )
 
   const [mensajeEntrega, setMensajeEntrega] = useState('')
 
@@ -202,6 +230,20 @@ function Mapa() {
   const [errorEntrega, setErrorEntrega] = useState('')
 
   const [guardandoEntrega, setGuardandoEntrega] = useState(false)
+
+
+  // =======================================================
+  // RESEÑAS
+  // =======================================================
+
+  const [puntoResenas, setPuntoResenas] = useState(null)
+
+  // Refleja en el mapa el nuevo promedio después de calificar
+  const actualizarCalificacion = (puntoId, calificacion) => {
+    setPuntos((actuales) =>
+      actuales.map((p) => (p.id === puntoId ? { ...p, ...calificacion } : p))
+    )
+  }
 
 
   // =======================================================
@@ -818,20 +860,7 @@ const abrirFormularioEntrega = (punto) => {
   setPuntoEntrega(punto)
   setMostrarEntrega(true)
 
-  const primerTipo = punto.categorias?.[0] || 'reciclaje'
-
-  setFormularioEntrega({
-    tipo:
-      primerTipo.toLowerCase().includes('ropa')
-        ? 'ropa'
-        : primerTipo.toLowerCase().includes('electr')
-        ? 'electronicos'
-        : 'reciclaje',
-    cantidad: '',
-    unidad: primerTipo.toLowerCase().includes('ropa')
-      ? 'prendas'
-      : 'kg'
-  })
+  setFormularioEntrega(formularioEntregaVacio(punto.categorias?.[0] || ''))
 
   setObservacionEntrega('')
   setMensajeEntrega('')
@@ -842,11 +871,7 @@ const cerrarFormularioEntrega = () => {
   setMostrarEntrega(false)
   setPuntoEntrega(null)
 
-  setFormularioEntrega({
-    tipo: 'reciclaje',
-    cantidad: '',
-    unidad: 'kg'
-  })
+  setFormularioEntrega(formularioEntregaVacio())
 
   setObservacionEntrega('')
   setMensajeEntrega('')
@@ -860,10 +885,23 @@ const cerrarFormularioEntrega = () => {
 
   const manejarCambioEntrega = (e) => {
     const { name, value } = e.target
-    setFormularioEntrega((prev) => ({
-      ...prev,
-      [name]: value
-    }))
+
+    setFormularioEntrega((prev) => {
+      // Al cambiar la categoría se ajustan el tipo y la unidad sugerida
+      if (name === 'categoria') {
+        const tipo = tipoDeCategoria(value)
+        return {
+          ...prev,
+          categoria: value,
+          tipo,
+          unidad: unidadPorDefecto(tipo),
+          estado_conservacion: tipo === 'reciclaje' ? '' : prev.estado_conservacion
+        }
+      }
+
+      return { ...prev, [name]: value }
+    })
+
     setErrorEntrega('')
     setMensajeEntrega('')
   }
@@ -894,6 +932,20 @@ const registrarEntrega = async (e) => {
     return
   }
 
+  const enKilos = formularioEntrega.unidad === 'kg'
+
+  if (!enKilos && formularioEntrega.peso && Number(formularioEntrega.peso) <= 0) {
+    setErrorEntrega('El peso debe ser mayor que 0')
+    return
+  }
+
+  const fotoUrl = formularioEntrega.foto_url.trim()
+
+  if (fotoUrl && !/^https?:\/\//i.test(fotoUrl)) {
+    setErrorEntrega('La URL de la foto debe empezar por http:// o https://')
+    return
+  }
+
   const token = localStorage.getItem('access_token')
 
   if (!token) {
@@ -903,9 +955,16 @@ const registrarEntrega = async (e) => {
 
   const datosEnviar = {
     punto_id: puntoEntrega.id,
+    categoria: formularioEntrega.categoria || null,
     tipo: formularioEntrega.tipo,
+    nombre_articulo: formularioEntrega.nombre_articulo.trim() || null,
     cantidad: Number(formularioEntrega.cantidad),
     unidad: formularioEntrega.unidad,
+    peso: !enKilos && formularioEntrega.peso
+      ? Number(formularioEntrega.peso)
+      : null,
+    estado_conservacion: formularioEntrega.estado_conservacion || null,
+    foto_url: fotoUrl || null,
     observacion: observacionEntrega.trim() || null
   }
 
@@ -931,12 +990,11 @@ const registrarEntrega = async (e) => {
     }
 
     setMensajeEntrega(
-      '¡Entrega registrada correctamente! Puedes verla en tu historial.'
+      '¡Entrega registrada! Quedó pendiente de verificación y puedes verla en tu historial.'
     )
 
     setFormularioEntrega({
-      tipo: formularioEntrega.tipo,
-      cantidad: '',
+      ...formularioEntregaVacio(formularioEntrega.categoria),
       unidad: formularioEntrega.unidad
     })
 
@@ -1370,6 +1428,25 @@ const registrarEntrega = async (e) => {
           {punto.nombre}
         </h3>
 
+        <button
+          type="button"
+          onClick={() => setPuntoResenas(punto)}
+          className="flex items-center gap-1.5 mb-2 text-[11px] text-gray-600 hover:text-amber-600 cursor-pointer"
+          aria-label={`Ver reseñas de ${punto.nombre}`}
+        >
+          {punto.total_resenas > 0 ? (
+            <>
+              <Estrellas valor={punto.calificacion_promedio} tamano="text-xs" />
+              <strong className="text-gray-800">
+                {Number(punto.calificacion_promedio).toLocaleString('es-CO', { maximumFractionDigits: 1 })}
+              </strong>
+              <span>({punto.total_resenas})</span>
+            </>
+          ) : (
+            <span>☆ Sin reseñas todavía</span>
+          )}
+        </button>
+
         <p className="text-xs text-gray-600 leading-relaxed mb-3">
           {punto.descripcion}
         </p>
@@ -1394,6 +1471,15 @@ const registrarEntrega = async (e) => {
           {cargandoRuta && puntoRuta?.id === punto.id
             ? '🚗 Calculando ruta...'
             : '🚗 Cómo llegar'}
+        </button>
+
+        {/* RESEÑAS */}
+        <button
+          type="button"
+          onClick={() => setPuntoResenas(punto)}
+          className="w-full mt-2 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
+        >
+          ⭐ Calificar y ver reseñas
         </button>
 
         {/* REPORTE */}
@@ -1436,6 +1522,20 @@ const registrarEntrega = async (e) => {
   </Marker>
 )}
 </MapContainer>
+
+{/* =========================================================
+    MODAL RESEÑAS
+========================================================= */}
+<AnimatePresence>
+  {puntoResenas && (
+    <ResenasPunto
+      key={puntoResenas.id}
+      punto={puntoResenas}
+      onCerrar={() => setPuntoResenas(null)}
+      onCalificacionActualizada={actualizarCalificacion}
+    />
+  )}
+</AnimatePresence>
 
 {/* =========================================================
     MODAL REGISTRAR ENTREGA
@@ -1523,21 +1623,79 @@ const registrarEntrega = async (e) => {
 
           <form onSubmit={registrarEntrega} className="space-y-5">
 
-            {/* TIPO */}
+            {/* CATEGORÍA */}
             <div>
-              <label className="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2">
-                Tipo de residuo
+              <label
+                htmlFor="categoria-entrega"
+                className="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2"
+              >
+                Categoría del material
               </label>
 
-              <div className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200">
-                {formularioEntrega.tipo === 'ropa' && '👕 Ropa'}
-                {formularioEntrega.tipo === 'electronicos' && '💻 Electrónicos'}
-                {formularioEntrega.tipo === 'reciclaje' && '♻️ Reciclaje'}
-              </div>
+              {puntoEntrega.categorias?.length > 1 ? (
+                <>
+                  <select
+                    id="categoria-entrega"
+                    name="categoria"
+                    value={formularioEntrega.categoria}
+                    onChange={manejarCambioEntrega}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
+                  >
+                    {puntoEntrega.categorias.map((categoria) => (
+                      <option key={categoria} value={categoria}>
+                        {categoria}
+                      </option>
+                    ))}
+                  </select>
 
-              <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1.5">
-                Se determina automáticamente según el punto seleccionado.
-              </p>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1.5">
+                    Este punto recibe varias categorías: elige la de tu entrega.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200">
+                    {formularioEntrega.tipo === 'ropa' && '👕 '}
+                    {formularioEntrega.tipo === 'electronicos' && '💻 '}
+                    {formularioEntrega.tipo === 'reciclaje' && '♻️ '}
+                    {formularioEntrega.categoria || 'Reciclaje'}
+                  </div>
+
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1.5">
+                    Es la categoría que recibe este punto.
+                  </p>
+                </>
+              )}
+            </div>
+
+            {/* ARTÍCULO */}
+            <div>
+              <label
+                htmlFor="articulo-entrega"
+                className="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2"
+              >
+                ¿Qué entregaste?
+                <span className="font-normal text-gray-400 ml-1">
+                  (opcional)
+                </span>
+              </label>
+
+              <input
+                id="articulo-entrega"
+                type="text"
+                name="nombre_articulo"
+                maxLength={120}
+                placeholder={
+                  formularioEntrega.tipo === 'ropa'
+                    ? 'Ej: Chaquetas y pantalones'
+                    : formularioEntrega.tipo === 'electronicos'
+                    ? 'Ej: Celular y cargador'
+                    : 'Ej: Botellas plásticas y cartón'
+                }
+                value={formularioEntrega.nombre_articulo}
+                onChange={manejarCambioEntrega}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
+              />
             </div>
 
             {/* CANTIDAD */}
@@ -1583,6 +1741,91 @@ const registrarEntrega = async (e) => {
                 <option value="unidades">Unidades</option>
                 <option value="prendas">Prendas</option>
               </select>
+            </div>
+
+            {/* PESO (solo si la unidad no es kg) */}
+            {formularioEntrega.unidad !== 'kg' && (
+              <div>
+                <label
+                  htmlFor="peso-entrega"
+                  className="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2"
+                >
+                  Peso aproximado (kg)
+                  <span className="font-normal text-gray-400 ml-1">
+                    (opcional)
+                  </span>
+                </label>
+
+                <input
+                  id="peso-entrega"
+                  type="number"
+                  name="peso"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="Ej: 2.5"
+                  value={formularioEntrega.peso}
+                  onChange={manejarCambioEntrega}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
+                />
+
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1.5">
+                  Suma al total de kilos del dashboard de impacto.
+                </p>
+              </div>
+            )}
+
+            {/* ESTADO DE CONSERVACIÓN (ropa y electrónicos) */}
+            {formularioEntrega.tipo !== 'reciclaje' && (
+              <div>
+                <label
+                  htmlFor="conservacion-entrega"
+                  className="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2"
+                >
+                  Estado de conservación
+                  <span className="font-normal text-gray-400 ml-1">
+                    (opcional)
+                  </span>
+                </label>
+
+                <select
+                  id="conservacion-entrega"
+                  name="estado_conservacion"
+                  value={formularioEntrega.estado_conservacion}
+                  onChange={manejarCambioEntrega}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
+                >
+                  <option value="">Sin especificar</option>
+                  {ESTADOS_CONSERVACION.map((estado) => (
+                    <option key={estado.id} value={estado.id}>
+                      {estado.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* FOTO */}
+            <div>
+              <label
+                htmlFor="foto-entrega"
+                className="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2"
+              >
+                URL de una foto
+                <span className="font-normal text-gray-400 ml-1">
+                  (opcional)
+                </span>
+              </label>
+
+              <input
+                id="foto-entrega"
+                type="url"
+                name="foto_url"
+                maxLength={500}
+                placeholder="https://..."
+                value={formularioEntrega.foto_url}
+                onChange={manejarCambioEntrega}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
+              />
             </div>
 
             {/* FECHA */}

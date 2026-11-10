@@ -31,6 +31,39 @@ export const CATEGORIAS_DISPONIBLES = [
   }
 ]
 
+// "reciclaje" | "ropa" | "electronicos" según el nombre de la categoría
+export function tipoDeCategoria(nombreCategoria = '') {
+  const nombre = nombreCategoria.toLowerCase()
+  if (nombre.includes('ropa')) return 'ropa'
+  if (nombre.includes('electr')) return 'electronicos'
+  return 'reciclaje'
+}
+
+export const ESTADOS_CONSERVACION = [
+  { id: 'nuevo', nombre: 'Nuevo' },
+  { id: 'bueno', nombre: 'Buen estado' },
+  { id: 'regular', nombre: 'Regular' },
+  { id: 'danado', nombre: 'Dañado' }
+]
+
+export const ESTADOS_ENTREGA = {
+  pendiente: {
+    nombre: 'Pendiente',
+    icono: '⏳',
+    clases: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900/40'
+  },
+  verificada: {
+    nombre: 'Verificada',
+    icono: '✅',
+    clases: 'bg-green-50 text-green-800 border-green-200 dark:bg-green-950/30 dark:text-green-300 dark:border-green-900/40'
+  },
+  rechazada: {
+    nombre: 'Rechazada',
+    icono: '❌',
+    clases: 'bg-red-50 text-red-800 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-900/40'
+  }
+}
+
 export function normalizarPunto(punto) {
   if (!punto) return punto
 

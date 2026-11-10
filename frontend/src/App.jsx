@@ -11,6 +11,7 @@ import Perfil from './pages/Perfil'
 import Admin from './pages/Admin'
 import MisPuntos from './pages/MisPuntos'
 import Historial from './pages/Historial'
+import Impacto from './pages/Impacto'
 
 function AppContent() {
   const location = useLocation()
@@ -76,6 +77,12 @@ function AppContent() {
         <Route
           path="/historial"
           element={<Historial />}
+        />
+
+        {/* IMPACTO */}
+        <Route
+          path="/impacto"
+          element={<Impacto />}
         />
 
         {/* ADMINISTRADOR */}

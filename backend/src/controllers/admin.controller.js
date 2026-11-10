@@ -49,6 +49,11 @@ export async function rechazarPunto(req, res) {
   res.json(serializar.punto(punto))
 }
 
+export async function marcarPuntoRevisado(req, res) {
+  const punto = await puntosService.marcarRevisado(req.params.punto_id)
+  res.json(serializar.punto(punto))
+}
+
 export async function eliminarPunto(req, res) {
   res.json(await puntosService.eliminar(req.params.punto_id))
 }
@@ -58,6 +63,11 @@ export async function eliminarPunto(req, res) {
 export async function listarEntregas(_req, res) {
   const entregas = await entregasService.listarTodas()
   res.json(entregas.map(serializar.entregaAdmin))
+}
+
+export async function revisarEntrega(req, res) {
+  const entrega = await entregasService.revisar(req.params.entrega_id, req.body)
+  res.json(serializar.entregaAdmin(entrega))
 }
 
 // ---------- Reportes ----------

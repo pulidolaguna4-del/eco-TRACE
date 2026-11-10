@@ -19,6 +19,15 @@ function numerico(base) {
 export const entero = numerico(z.number().int())
 export const decimal = numerico(z.number())
 
+export const enteroEntre = (minimo, maximo) =>
+  numerico(
+    z
+      .number()
+      .int()
+      .min(minimo, `Input should be greater than or equal to ${minimo}`)
+      .max(maximo, `Input should be less than or equal to ${maximo}`)
+  )
+
 // Para parámetros de ruta como /admin/puntos/:punto_id
 export const idParam = (nombre) => z.object({ [nombre]: entero })
 

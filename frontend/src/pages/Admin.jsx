@@ -5,7 +5,12 @@ import {
   AnimatePresence,
   useReducedMotion
 } from 'framer-motion'
-import { normalizarPunto } from '../utils/puntoUtils'
+import {
+  normalizarPunto,
+  formatearMensajeError,
+  ESTADOS_CONSERVACION,
+  ESTADOS_ENTREGA
+} from '../utils/puntoUtils'
 import { CategoriasBadges } from '../components/CategoriasBadges'
 
 const API_URL = 'http://127.0.0.1:8000'
@@ -230,11 +235,18 @@ function LoadingButton({
 const MOTIVO_RECHAZO_MIN = 5
 const MOTIVO_RECHAZO_MAX = 500
 
+// Sirve para rechazar puntos y entregas: `punto` es lo que se muestra
+// en la tarjeta (nombre y dirección) y los textos se pueden cambiar.
 function ModalRechazo({
   punto,
   procesando,
   onCancelar,
-  onConfirmar
+  onConfirmar,
+  titulo = 'Rechazar punto',
+  subtitulo = 'El motivo se le enviará al usuario que propuso el punto.',
+  etiqueta = 'Punto seleccionado',
+  textoConfirmar = 'Rechazar punto',
+  placeholder = 'Ej.: la ubicación no corresponde a la dirección indicada...'
 }) {
   const [motivo, setMotivo] = useState('')
   const [errorMotivo, setErrorMotivo] = useState('')
@@ -307,11 +319,11 @@ function ModalRechazo({
                 id="titulo-modal-rechazo"
                 className="text-xl font-extrabold text-gray-900 dark:text-white"
               >
-                Rechazar punto
+                {titulo}
               </h2>
 
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                El motivo se le enviará al usuario que propuso el punto.
+                {subtitulo}
               </p>
             </div>
           </div>
@@ -322,7 +334,7 @@ function ModalRechazo({
 
           <div className="rounded-2xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/40 p-4">
             <p className="text-[11px] uppercase tracking-wide font-bold text-red-700 dark:text-red-400 mb-1">
-              Punto seleccionado
+              {etiqueta}
             </p>
 
             <p className="text-base font-extrabold text-gray-900 dark:text-white">
@@ -355,7 +367,7 @@ function ModalRechazo({
               rows={4}
               autoFocus
               disabled={procesando}
-              placeholder="Ej.: la ubicación no corresponde a la dirección indicada..."
+              placeholder={placeholder}
               className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition resize-none"
             />
 
@@ -388,7 +400,7 @@ function ModalRechazo({
               {procesando && (
                 <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
               )}
-              {procesando ? 'Rechazando...' : 'Rechazar punto'}
+              {procesando ? 'Rechazando...' : textoConfirmar}
             </button>
           </div>
 
@@ -423,11 +435,20 @@ function Admin() {
   const [puntoEliminandoId, setPuntoEliminandoId] =
     useState(null)
 
+  // Punto señalado por reseñas negativas que se está marcando como revisado
+  const [puntoRevisandoId, setPuntoRevisandoId] =
+    useState(null)
+
   // Reportes enviados por la comunidad sobre puntos ecológicos.
   const [reportes, setReportes] = useState([])
   const [entregas, setEntregas] = useState([])
   const [observacionesReportes, setObservacionesReportes] = useState({})
   const [reporteProcesandoId, setReporteProcesandoId] = useState(null)
+
+  // Verificación de entregas
+  const [entregaProcesandoId, setEntregaProcesandoId] = useState(null)
+  const [entregaARechazar, setEntregaARechazar] = useState(null)
+  const [filtroEntregas, setFiltroEntregas] = useState('todas')
 
   const [cargando, setCargando] =
     useState(true)
@@ -982,6 +1003,54 @@ function Admin() {
   }
 
   // =========================================================
+  // MARCAR COMO REVISADO UN PUNTO SEÑALADO POR RESEÑAS
+  // =========================================================
+
+  const marcarPuntoRevisado = async (puntoId) => {
+    const token = localStorage.getItem('access_token')
+
+    if (!token) {
+      setError('Tu sesión ha expirado')
+      return
+    }
+
+    try {
+      setPuntoRevisandoId(puntoId)
+      setError('')
+      setMensaje('')
+
+      const respuesta = await fetch(
+        `${API_URL}/admin/puntos/${puntoId}/revision`,
+        {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      )
+
+      const datos = await respuesta.json().catch(() => null)
+
+      if (!respuesta.ok) {
+        throw new Error(
+          formatearMensajeError(datos?.detail, 'No se pudo marcar el punto como revisado')
+        )
+      }
+
+      const actualizado = normalizarPunto(datos)
+
+      setTodosLosPuntos((actuales) =>
+        actuales.map((p) => (p.id === puntoId ? actualizado : p))
+      )
+
+      setMensaje(`El punto "${actualizado.nombre}" quedó marcado como revisado`)
+    } catch (err) {
+      console.error(err)
+      setError(err.message)
+    } finally {
+      setPuntoRevisandoId(null)
+    }
+  }
+
+  // =========================================================
   // ELIMINAR PUNTO
   // =========================================================
 
@@ -1007,7 +1076,7 @@ function Admin() {
 
     const confirmar =
       window.confirm(
-        `¿Seguro que quieres eliminar el punto "${punto?.nombre || 'este punto'}"?\n\nTambién se eliminarán los reportes, entregas y relaciones con categorías asociadas a este punto.`
+        `¿Seguro que quieres eliminar el punto "${punto?.nombre || 'este punto'}"?\n\nTambién se eliminarán las reseñas, reportes, entregas y relaciones con categorías asociadas a este punto.`
       )
 
     if (!confirmar) {
@@ -1113,6 +1182,75 @@ function Admin() {
 
     } finally {
       setPuntoEliminandoId(null)
+    }
+  }
+
+  // =========================================================
+  // VERIFICAR / RECHAZAR ENTREGA
+  // =========================================================
+
+  const revisarEntrega = async (entregaId, estado, observacion = null) => {
+    const token = localStorage.getItem('access_token')
+
+    if (!token) {
+      setError('Tu sesión ha expirado')
+      return false
+    }
+
+    try {
+      setEntregaProcesandoId(entregaId)
+      setError('')
+      setMensaje('')
+
+      const respuesta = await fetch(
+        `${API_URL}/admin/entregas/${entregaId}/revisar`,
+        {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ estado, observacion_admin: observacion })
+        }
+      )
+
+      const datos = await respuesta.json().catch(() => null)
+
+      if (!respuesta.ok) {
+        throw new Error(
+          formatearMensajeError(datos?.detail, 'No se pudo actualizar la entrega')
+        )
+      }
+
+      setEntregas((actuales) =>
+        actuales.map((entrega) =>
+          entrega.id === entregaId ? datos : entrega
+        )
+      )
+
+      setMensaje(
+        estado === 'verificada'
+          ? 'Entrega verificada correctamente'
+          : 'Entrega rechazada correctamente'
+      )
+
+      return true
+    } catch (err) {
+      console.error(err)
+      setError(err.message)
+      return false
+    } finally {
+      setEntregaProcesandoId(null)
+    }
+  }
+
+  const confirmarRechazoEntrega = async (motivo) => {
+    if (!entregaARechazar) return
+
+    const guardado = await revisarEntrega(entregaARechazar.id, 'rechazada', motivo)
+
+    if (guardado) {
+      setEntregaARechazar(null)
     }
   }
 
@@ -1704,6 +1842,15 @@ function Admin() {
                     {todosLosPuntos.length}
                   </span>
                 )}
+
+                {todosLosPuntos.some((p) => p.revision_prioritaria) && (
+                  <span
+                    className="bg-amber-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-black"
+                    title="Puntos marcados para revisión prioritaria por reseñas negativas"
+                  >
+                    ⚠️ {todosLosPuntos.filter((p) => p.revision_prioritaria).length}
+                  </span>
+                )}
               </button>
     
               {/* ENTREGAS */}
@@ -2079,7 +2226,10 @@ function Admin() {
 
             <AnimatePresence>
 
-              {todosLosPuntos.map(
+              {[...todosLosPuntos]
+                // Primero los marcados para revisión prioritaria
+                .sort((a, b) => Number(Boolean(b.revision_prioritaria)) - Number(Boolean(a.revision_prioritaria)))
+                .map(
                 (punto) => {
 
                   const creador =
@@ -2120,6 +2270,21 @@ function Admin() {
 
                             <div className="text-[10px] text-gray-400 font-mono mt-1">
                               ID: {punto.id}
+                            </div>
+
+                            <div className="text-[11px] text-gray-500 dark:text-[#a8b3ae] mt-1">
+                              {punto.total_resenas > 0 ? (
+                                <>
+                                  <span className="text-amber-500">★</span>{' '}
+                                  <strong>
+                                    {Number(punto.calificacion_promedio).toLocaleString('es-CO', { maximumFractionDigits: 1 })}
+                                  </strong>
+                                  {' · '}
+                                  {punto.total_resenas} {punto.total_resenas === 1 ? 'reseña' : 'reseñas'}
+                                </>
+                              ) : (
+                                'Sin reseñas'
+                              )}
                             </div>
 
                             <p
@@ -2208,6 +2373,19 @@ function Admin() {
                           </p>
                         )}
 
+                        {punto.revision_prioritaria && (
+                          <div className="mt-2 max-w-[14rem] whitespace-normal rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 px-2.5 py-1.5">
+                            <p className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800 dark:text-amber-400">
+                              ⚠️ Revisión prioritaria
+                            </p>
+                            {punto.motivo_revision && (
+                              <p className="text-[10px] text-amber-700 dark:text-amber-300 mt-0.5">
+                                {punto.motivo_revision}
+                              </p>
+                            )}
+                          </div>
+                        )}
+
                       </td>
 
                       {/* CREADOR */}
@@ -2246,7 +2424,17 @@ function Admin() {
 
                       <td className="px-6 py-4 whitespace-nowrap">
 
-                        <div className="flex items-center justify-end">
+                        <div className="flex items-center justify-end gap-2">
+
+                          {punto.revision_prioritaria && (
+                            <LoadingButton
+                              cargando={puntoRevisandoId === punto.id}
+                              texto="✓ Marcar revisado"
+                              textoCargando="Guardando..."
+                              variante="secundario"
+                              onClick={() => marcarPuntoRevisado(punto.id)}
+                            />
+                          )}
 
                           <LoadingButton
                             cargando={
@@ -2308,15 +2496,40 @@ function Admin() {
           </h3>
 
           <p className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-1">
-            Consulta las entregas realizadas por los usuarios en los puntos ecológicos.
+            Verifica o rechaza las entregas que registran los usuarios en los puntos ecológicos.
           </p>
 
         </div>
 
-        <Badge
-          tipo="info"
-          texto={`${entregas.length} entregas`}
-        />
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar entregas por estado">
+          {[
+            { id: 'todas', nombre: 'Todas' },
+            { id: 'pendiente', nombre: 'Pendientes' },
+            { id: 'verificada', nombre: 'Verificadas' },
+            { id: 'rechazada', nombre: 'Rechazadas' }
+          ].map((f) => {
+            const activo = filtroEntregas === f.id
+            const total = f.id === 'todas'
+              ? entregas.length
+              : entregas.filter((e) => e.estado === f.id).length
+
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setFiltroEntregas(f.id)}
+                aria-pressed={activo}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors cursor-pointer ${
+                  activo
+                    ? 'bg-[#218739] dark:bg-[#2fa350] text-white border-transparent'
+                    : 'bg-white dark:bg-[#121816] text-gray-600 dark:text-[#a8b3ae] border-gray-200 dark:border-gray-800/60 hover:border-[#218739]/40'
+                }`}
+              >
+                {f.nombre} <span className="opacity-70">({total})</span>
+              </button>
+            )
+          })}
+        </div>
 
       </div>
 
@@ -2374,6 +2587,10 @@ function Admin() {
                 Observación
               </th>
 
+              <th className="px-6 py-4 text-right">
+                Acciones
+              </th>
+
             </tr>
 
           </thead>
@@ -2387,7 +2604,11 @@ function Admin() {
 
             <AnimatePresence>
 
-              {entregas.map(
+              {entregas
+                .filter((entrega) =>
+                  filtroEntregas === 'todas' || entrega.estado === filtroEntregas
+                )
+                .map(
                 (entrega) => (
 
                   <motion.tr
@@ -2451,26 +2672,51 @@ function Admin() {
 
                     {/* TIPO */}
 
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-4">
 
-                      {entrega.tipo === 'ropa' ? (
+                      <div className="whitespace-nowrap">
+                        {entrega.tipo === 'ropa' ? (
 
-                        <span className="text-xs font-bold">
-                          👕 Ropa
-                        </span>
+                          <span className="text-xs font-bold">
+                            👕 Ropa
+                          </span>
 
-                      ) : entrega.tipo === 'electronicos' ? (
+                        ) : entrega.tipo === 'electronicos' ? (
 
-                        <span className="text-xs font-bold">
-                          🔌 Electrónicos
-                        </span>
+                          <span className="text-xs font-bold">
+                            🔌 Electrónicos
+                          </span>
 
-                      ) : (
+                        ) : (
 
-                        <span className="text-xs font-bold">
-                          ♻️ Reciclaje
-                        </span>
+                          <span className="text-xs font-bold">
+                            ♻️ Reciclaje
+                          </span>
 
+                        )}
+                      </div>
+
+                      {entrega.nombre_articulo && (
+                        <div className="text-[11px] text-gray-600 dark:text-[#a8b3ae] mt-1 max-w-[12rem]">
+                          {entrega.nombre_articulo}
+                        </div>
+                      )}
+
+                      {entrega.estado_conservacion && (
+                        <div className="text-[10px] text-gray-400 mt-0.5">
+                          Estado: {ESTADOS_CONSERVACION.find((e) => e.id === entrega.estado_conservacion)?.nombre ?? entrega.estado_conservacion}
+                        </div>
+                      )}
+
+                      {entrega.foto_url && (
+                        <a
+                          href={entrega.foto_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-block text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline mt-1"
+                        >
+                          📷 Ver foto
+                        </a>
                       )}
 
                     </td>
@@ -2486,6 +2732,12 @@ function Admin() {
                       <div className="text-[10px] text-gray-400 uppercase font-bold">
                         {entrega.unidad}
                       </div>
+
+                      {entrega.peso && entrega.unidad !== 'kg' && (
+                        <div className="text-[10px] text-gray-400 font-bold mt-0.5">
+                          ≈ {entrega.peso} kg
+                        </div>
+                      )}
 
                     </td>
 
@@ -2521,15 +2773,25 @@ function Admin() {
 
                       <Badge
                         tipo={
-                          entrega.estado ===
-                          'registrada'
+                          entrega.estado === 'verificada'
                             ? 'aprobado'
+                            : entrega.estado === 'rechazada'
+                            ? 'rechazado'
                             : 'pendiente'
                         }
                         texto={
-                          entrega.estado
+                          ESTADOS_ENTREGA[entrega.estado]?.nombre ?? entrega.estado
                         }
                       />
+
+                      {entrega.estado === 'rechazada' && entrega.observacion_admin && (
+                        <p
+                          className="text-[10px] text-[#d93025] dark:text-[#ef5350] mt-1 max-w-[12rem] whitespace-normal"
+                          title={entrega.observacion_admin}
+                        >
+                          {entrega.observacion_admin}
+                        </p>
+                      )}
 
                     </td>
 
@@ -2553,6 +2815,34 @@ function Admin() {
                         </span>
 
                       )}
+
+                    </td>
+
+                    {/* ACCIONES */}
+
+                    <td className="px-6 py-4">
+
+                      <div className="flex justify-end gap-2">
+
+                        {entrega.estado !== 'verificada' && (
+                          <LoadingButton
+                            cargando={entregaProcesandoId === entrega.id}
+                            texto="✓ Verificar"
+                            textoCargando="Guardando..."
+                            onClick={() => revisarEntrega(entrega.id, 'verificada')}
+                          />
+                        )}
+
+                        {entrega.estado !== 'rechazada' && (
+                          <LoadingButton
+                            variante="peligro"
+                            texto="✕ Rechazar"
+                            deshabilitado={entregaProcesandoId === entrega.id}
+                            onClick={() => setEntregaARechazar(entrega)}
+                          />
+                        )}
+
+                      </div>
 
                     </td>
 
@@ -3473,6 +3763,28 @@ function Admin() {
             procesando={procesandoId === puntoARechazar.id}
             onCancelar={() => setPuntoARechazar(null)}
             onConfirmar={confirmarRechazo}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* MODAL PARA RECHAZAR UNA ENTREGA CON MOTIVO */}
+
+      <AnimatePresence>
+        {entregaARechazar && (
+          <ModalRechazo
+            key={`entrega-${entregaARechazar.id}`}
+            punto={{
+              nombre: `Entrega #${entregaARechazar.id} · ${entregaARechazar.usuario_nombre}`,
+              direccion: entregaARechazar.punto_nombre
+            }}
+            procesando={entregaProcesandoId === entregaARechazar.id}
+            onCancelar={() => setEntregaARechazar(null)}
+            onConfirmar={confirmarRechazoEntrega}
+            titulo="Rechazar entrega"
+            subtitulo="El usuario verá este motivo en su historial de entregas."
+            etiqueta="Entrega seleccionada"
+            textoConfirmar="Rechazar entrega"
+            placeholder="Ej.: la cantidad registrada no coincide con lo recibido en el punto..."
           />
         )}
       </AnimatePresence>

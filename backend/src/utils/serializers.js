@@ -37,40 +37,70 @@ export function punto(p) {
     fecha_creacion: fecha(p.fecha_creacion),
     foto_url: p.foto_url ?? null,
     motivo_rechazo: p.motivo_rechazo ?? null,
-    usuario_id: p.usuario_id
+    usuario_id: p.usuario_id,
+    calificacion_promedio: p.calificacion_promedio ?? 0,
+    total_resenas: p.total_resenas ?? 0,
+    revision_prioritaria: p.revision_prioritaria ?? false,
+    motivo_revision: p.motivo_revision ?? null,
+    fecha_revision: fecha(p.fecha_revision) ?? null
   }
 }
 
+// Incluir con: include: { usuario: { select: { nombre: true } } }
+export function resena(r) {
+  return {
+    id: r.id,
+    punto_id: r.punto_id,
+    usuario_id: r.usuario_id,
+    nombre_usuario: r.usuario?.nombre ?? 'Usuario eliminado',
+    puntuacion: r.puntuacion,
+    comentario: r.comentario ?? null,
+    fecha: fecha(r.fecha),
+    fecha_actualizacion: fecha(r.fecha_actualizacion)
+  }
+}
+
+// Resumen de calificación de un punto
+export function calificacion(p) {
+  return {
+    punto_id: p.id,
+    calificacion_promedio: p.calificacion_promedio ?? 0,
+    total_resenas: p.total_resenas ?? 0
+  }
+}
+
+// Incluir con: include: { punto: true, categoria: true }
 export function entrega(e) {
   return {
     id: e.id,
     usuario_id: e.usuario_id,
     punto_id: e.punto_id,
+    punto_nombre: e.punto?.nombre ?? null,
+    punto_direccion: e.punto?.direccion ?? null,
+    categoria_id: e.categoria_id ?? null,
+    categoria: e.categoria?.nombre ?? null,
     tipo: e.tipo,
+    nombre_articulo: e.nombre_articulo ?? null,
     cantidad: e.cantidad,
     unidad: e.unidad,
+    peso: e.peso ?? null,
+    estado_conservacion: e.estado_conservacion ?? null,
+    foto_url: e.foto_url ?? null,
     fecha: fecha(e.fecha),
     estado: e.estado,
-    observacion: e.observacion ?? null
+    observacion: e.observacion ?? null,
+    observacion_admin: e.observacion_admin ?? null
   }
 }
 
-// Incluir con: include: { usuario: true, punto: true }
+// Incluir con: include: { usuario: true, punto: true, categoria: true }
 export function entregaAdmin(e) {
   return {
-    id: e.id,
-    usuario_id: e.usuario_id,
+    ...entrega(e),
     usuario_nombre: e.usuario?.nombre ?? 'Usuario no encontrado',
     usuario_correo: e.usuario?.correo ?? '',
-    punto_id: e.punto_id,
     punto_nombre: e.punto?.nombre ?? 'Punto no encontrado',
-    punto_direccion: e.punto?.direccion ?? '',
-    tipo: e.tipo,
-    cantidad: e.cantidad,
-    unidad: e.unidad,
-    fecha: fecha(e.fecha),
-    estado: e.estado,
-    observacion: e.observacion ?? null
+    punto_direccion: e.punto?.direccion ?? ''
   }
 }
 
