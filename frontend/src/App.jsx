@@ -2,8 +2,7 @@ import { Routes, Route, useLocation } from 'react-router-dom'
 
 import Navbar from './components/Navbar'
 
-import Login from './pages/Login'
-import Register from './pages/Register'
+import Autenticacion from './pages/Autenticacion'
 import RecuperarPassword from './pages/RecuperarPassword'
 import Home from './pages/Home'
 import Mapa from './pages/Mapa'
@@ -40,16 +39,12 @@ function AppContent() {
           element={<Home />}
         />
 
-        {/* AUTENTICACIÓN */}
-        <Route
-          path="/login"
-          element={<Login />}
-        />
-
-        <Route
-          path="/register"
-          element={<Register />}
-        />
+        {/* AUTENTICACIÓN: ruta de layout para que /login y /register
+            compartan la misma página y se anime el cambio entre ambas */}
+        <Route element={<Autenticacion />}>
+          <Route path="/login" element={null} />
+          <Route path="/register" element={null} />
+        </Route>
 
         <Route
           path="/recuperar-password"
