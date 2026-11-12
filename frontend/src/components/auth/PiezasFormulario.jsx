@@ -89,11 +89,11 @@ export function BotonEnviar({ cargando, texto, textoCargando, className }) {
   )
 }
 
-export function Separador() {
+export function Separador({ texto = 'o' }) {
   return (
     <div className="flex items-center gap-4 my-7" aria-hidden="true">
       <span className="flex-1 h-px bg-gray-200 dark:bg-gray-800" />
-      <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">o</span>
+      <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{texto}</span>
       <span className="flex-1 h-px bg-gray-200 dark:bg-gray-800" />
     </div>
   )

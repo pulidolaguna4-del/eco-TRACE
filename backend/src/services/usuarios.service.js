@@ -32,6 +32,13 @@ export async function cambiarContrasena(usuario, { password_actual, nueva_passwo
     throw new HttpError(400, 'La nueva contraseña debe tener al menos 8 caracteres')
   }
 
+  if (!usuario.password) {
+    throw new HttpError(
+      400,
+      'Tu cuenta usa Google y no tiene contraseña. Para crear una, usa "¿Olvidaste tu contraseña?" en el inicio de sesión.'
+    )
+  }
+
   if (password_actual === nueva_password) {
     throw new HttpError(400, 'La nueva contraseña debe ser diferente a la actual')
   }

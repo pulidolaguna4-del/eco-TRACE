@@ -38,6 +38,8 @@ services:
       EMAIL_PORT: ${EMAIL_PORT:?Falta EMAIL_PORT en .env}
       EMAIL_USER: ${EMAIL_USER:?Falta EMAIL_USER en .env}
       EMAIL_PASSWORD: ${EMAIL_PASSWORD:?Falta EMAIL_PASSWORD en .env}
+      # Opcional: inicio de sesión con Google (Client ID de Google Cloud)
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
 
     # Fotos de las entregas: el volumen las conserva al reconstruir
     volumes:
@@ -56,6 +58,10 @@ services:
 
     ports:
       - "5173:5173"
+
+    # El mismo Client ID para el botón de Google (Vite solo expone VITE_*)
+    environment:
+      VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
 
     depends_on:
       - backend

@@ -11,6 +11,7 @@ import {
   MensajeFormulario,
   Separador
 } from './PiezasFormulario'
+import BotonGoogle from './BotonGoogle'
 
 const CLAVE_CORREO_RECORDADO = 'correo_recordado'
 
@@ -171,6 +172,9 @@ function FormularioLogin() {
           </Link>
         </p>
       </div>
+
+      <BotonGoogle modo="login" />
+      <Separador texto="o con tu correo" />
 
       <form onSubmit={handleSubmit} noValidate className="space-y-5">
         <div>

@@ -18,6 +18,12 @@ export async function login(req, res) {
   res.json({ ...resultado, usuario: serializar.usuario(resultado.usuario) })
 }
 
+// Inicia sesión o crea la cuenta con el ID token de Google
+export async function loginConGoogle(req, res) {
+  const resultado = await authService.loginConGoogle(req.body)
+  res.json({ ...resultado, usuario: serializar.usuario(resultado.usuario) })
+}
+
 // ---------- Recuperación de contraseña ----------
 
 export async function solicitarRecuperacion(req, res) {

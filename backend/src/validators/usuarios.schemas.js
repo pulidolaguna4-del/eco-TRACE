@@ -11,6 +11,11 @@ export const loginSchema = z.object({
   password: z.string()
 })
 
+// ID token que Google entrega al frontend
+export const googleSchema = z.object({
+  credential: z.string().min(1, 'Field required').max(4096)
+})
+
 export const actualizarPerfilSchema = z.object({
   nombre: z.string(),
   correo: z.string()

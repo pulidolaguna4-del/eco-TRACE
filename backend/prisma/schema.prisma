@@ -16,11 +16,14 @@ datasource db {
 }
 
 model Usuario {
-  id       Int     @id @default(autoincrement())
-  nombre   String  @db.VarChar
-  correo   String  @unique(map: "ix_usuarios_correo") @db.VarChar
-  password String  @db.VarChar
-  es_admin Boolean @default(false)
+  id        Int     @id @default(autoincrement())
+  nombre    String  @db.VarChar
+  correo    String  @unique(map: "ix_usuarios_correo") @db.VarChar
+  // Null en las cuentas creadas con Google
+  password  String? @db.VarChar
+  // Identificador de la cuenta de Google ("sub" del ID token)
+  google_id String? @unique(map: "ix_usuarios_google_id") @db.VarChar
+  es_admin  Boolean @default(false)
 
   puntos               Punto[]
   entregas             Entrega[]

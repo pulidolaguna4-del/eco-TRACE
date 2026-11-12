@@ -11,6 +11,7 @@ import {
   MensajeFormulario,
   Separador
 } from './PiezasFormulario'
+import BotonGoogle from './BotonGoogle'
 
 const MINIMO_CONTRASENA = 6
 
@@ -132,6 +133,9 @@ function FormularioRegistro() {
           </Link>
         </p>
       </div>
+
+      <BotonGoogle modo="registro" />
+      <Separador texto="o con tu correo" />
 
       <form onSubmit={manejarRegistro} noValidate className="space-y-5">
         <div>

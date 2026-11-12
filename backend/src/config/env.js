@@ -45,6 +45,12 @@ export const config = {
     password: emailPassword
   },
 
+  // Inicio de sesión con Google: Client ID de tipo "Aplicación web" de
+  // Google Cloud. Si no está, el endpoint responde 503 y el resto sigue igual.
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID || null
+  },
+
   // Archivos subidos (fotos de entregas). En Docker es un volumen.
   // En la base de datos solo se guarda la ruta pública: /uploads/entregas/<archivo>
   archivos: {

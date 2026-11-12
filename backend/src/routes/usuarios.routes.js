@@ -10,6 +10,7 @@ const router = Router()
 // Autenticación
 router.post('/registro', validate({ body: schemas.registroSchema }), ctrl.registrar)
 router.post('/login', validate({ body: schemas.loginSchema }), ctrl.login)
+router.post('/google', validate({ body: schemas.googleSchema }), ctrl.loginConGoogle)
 
 // Recuperación de contraseña
 router.post('/recuperar', validate({ body: schemas.solicitarRecuperacionSchema }), ctrl.solicitarRecuperacion)

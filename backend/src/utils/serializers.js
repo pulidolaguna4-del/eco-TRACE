@@ -18,7 +18,10 @@ export function usuario(u) {
     id: u.id,
     nombre: u.nombre,
     correo: u.correo,
-    es_admin: u.es_admin
+    es_admin: u.es_admin,
+    // Para que el perfil sepa si puede cambiar la contraseña
+    con_google: Boolean(u.google_id),
+    tiene_password: Boolean(u.password)
   }
 }
 
