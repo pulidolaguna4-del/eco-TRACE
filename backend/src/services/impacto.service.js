@@ -5,6 +5,7 @@
 // las que siguen pendientes de verificación (se informan aparte).
 
 import { prisma } from '../config/prisma.js'
+import { resumenImpacto as resumenRegalos } from './regalos.service.js'
 import { HttpError } from '../utils/HttpError.js'
 
 const NO_RECHAZADA = { estado: { not: 'rechazada' } }
@@ -99,7 +100,7 @@ export async function obtener({ categoria: nombreCategoria, esAdmin = false }) {
     ...(categoria ? { categorias: { some: { categoria_id: categoria.id } } } : {})
   }
 
-  const [totales, porVerificar, puntosActivos, usuariosParticipantes, categorias, admin] =
+  const [totales, porVerificar, puntosActivos, usuariosParticipantes, categorias, admin, regalos] =
     await Promise.all([
       prisma.entrega.aggregate({
         where: filtroEntregas,
@@ -110,7 +111,9 @@ export async function obtener({ categoria: nombreCategoria, esAdmin = false }) {
       prisma.punto.count({ where: filtroPuntos }),
       prisma.entrega.groupBy({ by: ['usuario_id'], where: filtroEntregas }),
       porCategoria(),
-      esAdmin ? resumenAdmin() : null
+      esAdmin ? resumenAdmin() : null,
+      // Regalos entregados: "kg reutilizados", separado de los reciclados
+      resumenRegalos()
     ])
 
   return {
@@ -121,6 +124,7 @@ export async function obtener({ categoria: nombreCategoria, esAdmin = false }) {
     puntos_activos: puntosActivos,
     usuarios_participantes: usuariosParticipantes.length,
     por_categoria: categorias,
+    regalos,
     ...(admin ? { admin } : {})
   }
 }

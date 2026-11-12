@@ -31,6 +31,13 @@ model Usuario {
   resenas              Resena[]
   codigos_recuperacion CodigoRecuperacion[]
 
+  // Regalos (marketplace gratuito)
+  regalos            Regalo[]        @relation("RegalosPublicados")
+  regalos_reservados Regalo[]        @relation("RegalosReservados")
+  conversaciones     Conversacion[]
+  mensajes           Mensaje[]
+  reportes_regalo    ReporteRegalo[]
+
   @@map("usuarios")
 }
 
@@ -166,4 +173,98 @@ model Reporte {
   @@index([punto_id], map: "ix_reportes_punto_id")
   @@index([usuario_id], map: "ix_reportes_usuario_id")
   @@map("reportes")
+}
+
+// =========================================================
+// REGALOS (MARKETPLACE GRATUITO) - docs/requisitos/Especificacion_Regalos.md
+// =========================================================
+// Las coordenadas exactas nunca se devuelven en la API pública: solo
+// una zona aproximada (ver regalos.service.js#zonaAproximada).
+
+model Regalo {
+  id                  Int       @id @default(autoincrement())
+  usuario_id          Int
+  titulo              String    @db.VarChar(80)
+  descripcion         String?   @db.VarChar(500)
+  // madera | papel_carton | plastico | vidrio | metal | ropa | electronicos | muebles | otro
+  categoria           String    @db.VarChar(30)
+  cantidad            Float
+  // kg | unidades
+  unidad              String    @db.VarChar(20)
+  // disponible | reservado | entregado | cancelado | vencido
+  estado              String    @default("disponible") @db.VarChar(20)
+  oculto              Boolean   @default(false)
+  motivo_ocultamiento String?   @db.VarChar(500)
+  latitud             Float
+  longitud            Float
+  barrio              String?   @db.VarChar(80)
+  fotos               String[]  @default([])
+  reservado_para_id   Int?
+  fecha_creacion      DateTime  @default(now()) @db.Timestamp(6)
+  fecha_actualizacion DateTime  @default(now()) @updatedAt @db.Timestamp(6)
+  fecha_vencimiento   DateTime  @db.Timestamp(6)
+  fecha_entrega       DateTime? @db.Timestamp(6)
+
+  usuario        Usuario         @relation("RegalosPublicados", fields: [usuario_id], references: [id], onDelete: Cascade)
+  reservado_para Usuario?        @relation("RegalosReservados", fields: [reservado_para_id], references: [id], onDelete: SetNull)
+  conversaciones Conversacion[]
+  reportes       ReporteRegalo[]
+
+  @@index([estado], map: "ix_regalos_estado")
+  @@index([usuario_id], map: "ix_regalos_usuario_id")
+  @@map("regalos")
+}
+
+model Conversacion {
+  id                   Int      @id @default(autoincrement())
+  regalo_id            Int
+  interesado_id        Int
+  fecha_creacion       DateTime @default(now()) @db.Timestamp(6)
+  fecha_ultimo_mensaje DateTime @default(now()) @db.Timestamp(6)
+
+  regalo     Regalo    @relation(fields: [regalo_id], references: [id], onDelete: Cascade)
+  interesado Usuario   @relation(fields: [interesado_id], references: [id], onDelete: Cascade)
+  mensajes   Mensaje[]
+
+  @@unique([regalo_id, interesado_id], map: "uq_conversaciones_regalo_interesado")
+  @@index([interesado_id], map: "ix_conversaciones_interesado_id")
+  @@map("conversaciones")
+}
+
+model Mensaje {
+  id              Int       @id @default(autoincrement())
+  conversacion_id Int
+  // Null en los mensajes del sistema ("Reservado para ti"...)
+  remitente_id    Int?
+  texto           String    @db.VarChar(1000)
+  // usuario | sistema
+  tipo            String    @default("usuario") @db.VarChar(20)
+  fecha           DateTime  @default(now()) @db.Timestamp(6)
+  leido_en        DateTime? @db.Timestamp(6)
+
+  conversacion Conversacion    @relation(fields: [conversacion_id], references: [id], onDelete: Cascade)
+  remitente    Usuario?        @relation(fields: [remitente_id], references: [id], onDelete: Cascade)
+  reportes     ReporteRegalo[]
+
+  @@index([conversacion_id, fecha], map: "ix_mensajes_conversacion_fecha")
+  @@map("mensajes")
+}
+
+model ReporteRegalo {
+  id                Int      @id @default(autoincrement())
+  regalo_id         Int
+  mensaje_id        Int?
+  usuario_id        Int
+  motivo            String   @db.VarChar(500)
+  // pendiente | revisado | descartado
+  estado            String   @default("pendiente") @db.VarChar(20)
+  observacion_admin String?  @db.VarChar(500)
+  fecha_creacion    DateTime @default(now()) @db.Timestamp(6)
+
+  regalo  Regalo   @relation(fields: [regalo_id], references: [id], onDelete: Cascade)
+  mensaje Mensaje? @relation(fields: [mensaje_id], references: [id], onDelete: SetNull)
+  usuario Usuario  @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+  @@index([estado], map: "ix_reportes_regalo_estado")
+  @@map("reportes_regalo")
 }
