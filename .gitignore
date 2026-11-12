@@ -27,3 +27,6 @@ frontend/.env
 .DS_Store
 # Fotos subidas por los usuarios
 backend/uploads/
+
+# Archivos temporales de Office
+~$*
