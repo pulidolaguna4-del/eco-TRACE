@@ -10,6 +10,7 @@ import Perfil from './pages/Perfil'
 import Admin from './pages/Admin'
 import MisPuntos from './pages/MisPuntos'
 import Historial from './pages/Historial'
+import MisReportes from './pages/MisReportes'
 import Impacto from './pages/Impacto'
 
 function AppContent() {
@@ -72,6 +73,12 @@ function AppContent() {
         <Route
           path="/historial"
           element={<Historial />}
+        />
+
+        {/* MIS REPORTES (con la respuesta del administrador) */}
+        <Route
+          path="/mis-reportes"
+          element={<MisReportes />}
         />
 
         {/* IMPACTO */}

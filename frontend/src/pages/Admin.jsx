@@ -11,7 +11,7 @@
 //   eliminaciones se confirman en un modal.
 
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 
 import { normalizarPunto, formatearMensajeError } from '../utils/puntoUtils'
@@ -172,7 +172,11 @@ function Admin() {
   const [confirmacion, setConfirmacion] = useState(null) // { tipo: 'punto' | 'usuario', elemento }
 
   // Navegación, filtros y búsquedas
-  const [seccion, setSeccion] = useState('resumen')
+  // La sección va en la URL (?seccion=reportes) para que "atrás" vuelva a ella
+  const [parametros, setParametros] = useSearchParams()
+  const seccion = ENCABEZADOS[parametros.get('seccion')] ? parametros.get('seccion') : 'resumen'
+  const setSeccion = (destino) =>
+    setParametros(destino === 'resumen' ? {} : { seccion: destino }, { replace: true })
   const [filtroPuntos, setFiltroPuntos] = useState('todos')
   const [busquedaPuntos, setBusquedaPuntos] = useState('')
   const [filtroEntregas, setFiltroEntregas] = useState('todas')

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 
 import {
@@ -222,6 +222,10 @@ function Mapa() {
 
   // Aviso de "inicia sesión para proponer" cuando no hay sesión
   const [pedirSesion, setPedirSesion] = useState(false)
+
+  // Enlace directo a un punto (/mapa?punto=ID), p. ej. desde un reporte del panel
+  const [parametros, setParametros] = useSearchParams()
+  const [avisoEnlace, setAvisoEnlace] = useState('')
 
   // Marcadores de Leaflet por id de punto (para abrir su ventana desde la lista)
   const marcadores = useRef({})
@@ -529,6 +533,31 @@ function Mapa() {
       duration: prefiereReducido ? 0 : 0.9
     })
   }
+
+  // Si se llegó con ?punto=ID, enfocar ese punto cuando el mapa y los
+  // puntos estén listos. Luego se quita el parámetro de la URL.
+  useEffect(() => {
+    const idEnlace = Number(parametros.get('punto'))
+    if (!idEnlace || cargando || !mapa) return
+
+    const punto = puntos.find((p) => p.id === idEnlace)
+
+    if (punto) {
+      setAvisoEnlace('')
+      irAPunto(punto)
+    } else {
+      setAvisoEnlace('Ese punto no está publicado en el mapa: puede estar pendiente, rechazado o eliminado.')
+    }
+
+    setParametros(
+      (actuales) => {
+        actuales.delete('punto')
+        return actuales
+      },
+      { replace: true }
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parametros, cargando, mapa, puntos])
 
   // Proponer un punto exige sesión: sin ella, se invita a entrar
   const proponerPunto = () => {
@@ -1076,7 +1105,7 @@ const crearPunto = async (e) => {
       }
 
       setMensajeReporte(
-        '¡Reporte enviado correctamente! Será revisado por un administrador.'
+        '¡Reporte enviado! Un administrador lo revisará y podrás ver su respuesta en "Mis reportes", desde tu menú de usuario.'
       )
       setMotivoReporte('')
     } catch (err) {
@@ -1664,6 +1693,30 @@ const registrarEntrega = async (e) => {
                   </button>
                 )}
               </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+
+        {/* AVISO: EL PUNTO DEL ENLACE NO ESTÁ EN EL MAPA */}
+        <AnimatePresence>
+          {avisoEnlace && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              role="status"
+              className="p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 rounded-2xl text-xs font-bold text-amber-900 dark:text-amber-300 flex items-center justify-between gap-4 shadow-2xs"
+            >
+              <span>⚠️ {avisoEnlace}</span>
+              <button
+                type="button"
+                onClick={() => setAvisoEnlace('')}
+                className="w-8 h-8 shrink-0 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30 cursor-pointer"
+                aria-label="Cerrar aviso"
+              >
+                ✕
+              </button>
             </motion.div>
           )}
         </AnimatePresence>

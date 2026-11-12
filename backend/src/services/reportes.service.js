@@ -37,6 +37,14 @@ export async function registrar(usuarioId, { punto_id, motivo }) {
   })
 }
 
+export function listarDeUsuario(usuarioId) {
+  return prisma.reporte.findMany({
+    where: { usuario_id: usuarioId },
+    include: { punto: true },
+    orderBy: { fecha_creacion: 'desc' }
+  })
+}
+
 export function listarTodos() {
   return prisma.reporte.findMany({
     include: { usuario: true, punto: true },

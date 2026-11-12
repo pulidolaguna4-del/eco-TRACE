@@ -5,14 +5,16 @@
 // El administrador los marca como revisados o los descarta, con una
 // observación opcional.
 
+import { Link } from 'react-router-dom'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 
-import { claseTarjeta, claseCampo, Avatar, BotonAccion, EstadoVacio, Esqueleto, FiltroChips, Insignia } from './ui'
+import { claseTarjeta, claseCampo, anilloFoco, Avatar, BotonAccion, EstadoVacio, Esqueleto, FiltroChips, Insignia } from './ui'
 import { formatearFecha, haceCuanto, ESTADO_A_INSIGNIA, NOMBRE_ESTADO, variantesItem } from './utilidades'
 
 function datosReporte(reporte) {
   return {
     id: reporte.id ?? reporte.reporte_id,
+    puntoId: reporte.punto_id ?? reporte.punto?.id ?? null,
     estado: reporte.estado || 'pendiente',
     punto: reporte.punto_nombre || reporte.nombre_punto || reporte.punto?.nombre || `Punto #${reporte.punto_id ?? '—'}`,
     autor:
@@ -85,7 +87,18 @@ export default function SeccionReportes({ reportes, filtro, onFiltro, observacio
                           </p>
                         </div>
                       </div>
-                      <Insignia tipo={ESTADO_A_INSIGNIA[r.estado] || 'pendiente'}>{pendiente ? 'Abierto' : NOMBRE_ESTADO[r.estado] || r.estado}</Insignia>
+                      <div className="flex flex-col-reverse sm:flex-row items-end sm:items-center gap-2 shrink-0">
+                        {r.puntoId != null && (
+                          <Link
+                            to={`/mapa?punto=${r.puntoId}`}
+                            className={`inline-flex items-center gap-1.5 min-h-9 px-3.5 rounded-xl text-xs font-bold text-[#176b2b] dark:text-[#2fa350] bg-[#f1f8f4] dark:bg-[#0f1512] border border-[#218739]/20 dark:border-gray-800 hover:bg-[#218739]/10 dark:hover:bg-[#2fa350]/10 transition-colors ${anilloFoco}`}
+                            aria-label={`Ver en el mapa el punto ${r.punto}`}
+                          >
+                            <span aria-hidden="true">🗺️</span> Ver en el mapa
+                          </Link>
+                        )}
+                        <Insignia tipo={ESTADO_A_INSIGNIA[r.estado] || 'pendiente'}>{pendiente ? 'Abierto' : NOMBRE_ESTADO[r.estado] || r.estado}</Insignia>
+                      </div>
                     </div>
 
                     <blockquote className="mt-4 rounded-2xl bg-gray-50 dark:bg-[#0f1512] border border-gray-100 dark:border-gray-800/60 p-4">
@@ -99,10 +112,13 @@ export default function SeccionReportes({ reportes, filtro, onFiltro, observacio
                       </footer>
                     </blockquote>
 
-                    {r.original.observacion_admin && !pendiente && (
-                      <p className="mt-3 text-xs text-gray-600 dark:text-[#a8b3ae]">
-                        <span className="font-bold text-gray-800 dark:text-[#dce4e0]">Tu observación:</span> {r.original.observacion_admin}
-                      </p>
+                    {!pendiente && (
+                      <div className="mt-3 rounded-2xl border border-gray-100 dark:border-gray-800/60 px-4 py-3">
+                        <p className="text-[11px] font-extrabold uppercase tracking-wider text-gray-500 dark:text-[#a8b3ae]">Tu respuesta</p>
+                        <p className="mt-1 text-sm text-gray-700 dark:text-[#dce4e0] whitespace-pre-wrap break-words">
+                          {r.original.observacion_admin || <span className="italic text-gray-500 dark:text-[#a8b3ae]">Sin comentarios.</span>}
+                        </p>
+                      </div>
                     )}
                   </div>
 
@@ -110,18 +126,27 @@ export default function SeccionReportes({ reportes, filtro, onFiltro, observacio
                     <div className="px-5 sm:px-6 py-4 bg-gray-50/60 dark:bg-[#121816]/60 border-t border-gray-100 dark:border-gray-800/60 space-y-3">
                       <div>
                         <label htmlFor={idCampo} className="block text-xs font-bold text-gray-700 dark:text-[#dce4e0] mb-1.5">
-                          Observación <span className="font-semibold text-gray-500 dark:text-[#a8b3ae]">(opcional)</span>
+                          Respuesta para {r.autor.split(' ')[0]} <span className="font-semibold text-gray-500 dark:text-[#a8b3ae]">(opcional)</span>
                         </label>
                         <textarea
                           id={idCampo}
                           value={observaciones[r.id] || ''}
                           onChange={(e) => onObservacion(r.id, e.target.value)}
                           rows={2}
-                          maxLength={1000}
-                          placeholder="Ej.: se corrigió el horario del punto."
+                          maxLength={500}
+                          placeholder="Ej.: gracias por avisar, ya corregimos el horario del punto."
                           disabled={procesando}
+                          aria-describedby={`${idCampo}-ayuda`}
                           className={`${claseCampo} resize-none`}
                         />
+                        <div className="flex justify-between gap-3 mt-1.5">
+                          <p id={`${idCampo}-ayuda`} className="text-xs text-gray-500 dark:text-[#a8b3ae]">
+                            Quien envió el reporte verá esta respuesta en "Mis reportes".
+                          </p>
+                          <p className="text-xs font-bold text-gray-500 dark:text-[#a8b3ae] tabular-nums shrink-0" aria-hidden="true">
+                            {(observaciones[r.id] || '').length}/500
+                          </p>
+                        </div>
                       </div>
                       <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
                         <BotonAccion

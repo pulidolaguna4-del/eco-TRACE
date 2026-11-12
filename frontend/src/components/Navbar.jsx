@@ -23,7 +23,8 @@ const ENLACES = [
 const ENLACES_USUARIO = [
   { to: '/perfil', texto: 'Mi perfil', icono: '👤' },
   { to: '/mis-puntos', texto: 'Mis puntos', icono: '📍' },
-  { to: '/historial', texto: 'Mis entregas', icono: '♻️' }
+  { to: '/historial', texto: 'Mis entregas', icono: '♻️' },
+  { to: '/mis-reportes', texto: 'Mis reportes', icono: '🚩' }
 ]
 
 function leerUsuario() {

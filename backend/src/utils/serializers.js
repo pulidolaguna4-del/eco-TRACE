@@ -104,6 +104,21 @@ export function entregaAdmin(e) {
   }
 }
 
+// Reporte visto por quien lo envió. Incluir con: include: { punto: true }
+export function reporteUsuario(r) {
+  return {
+    id: r.id,
+    punto_id: r.punto_id,
+    nombre_punto: r.punto?.nombre ?? 'Punto eliminado',
+    direccion_punto: r.punto?.direccion ?? null,
+    estado_punto: r.punto?.estado ?? null,
+    motivo: r.motivo,
+    estado: r.estado,
+    fecha_creacion: fecha(r.fecha_creacion),
+    observacion_admin: r.observacion_admin ?? null
+  }
+}
+
 // Incluir con: include: { usuario: true, punto: true }
 export function reporteAdmin(r) {
   return {
