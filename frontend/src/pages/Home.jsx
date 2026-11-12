@@ -341,30 +341,7 @@ function Hero({ impacto, sesionActiva }) {
   )
 }
 
-function AvisoAdmin({ admin }) {
-  const pendientes = admin.puntos_pendientes + admin.entregas_pendientes + admin.reportes_pendientes
 
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 relative z-10">
-      <Aparecer>
-        <div className="rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-lg">
-          <p className="text-sm text-amber-900 dark:text-amber-300">
-            <strong>👑 Panel de moderación:</strong>{' '}
-            {pendientes === 0
-              ? 'no hay nada pendiente por revisar.'
-              : `${admin.puntos_pendientes} puntos, ${admin.entregas_pendientes} entregas y ${admin.reportes_pendientes} reportes esperan revisión.`}
-          </p>
-          <Link
-            to="/admin"
-            className="shrink-0 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold text-center transition-colors"
-          >
-            Ir a moderación
-          </Link>
-        </div>
-      </Aparecer>
-    </div>
-  )
-}
 
 function QueEs() {
   const pilares = [
@@ -829,7 +806,6 @@ function Home() {
   return (
     <div className="min-h-screen bg-[#f1f8f4] dark:bg-[#0f1512] font-sans text-[#333333] dark:text-[#f2f5f3] transition-colors duration-300">
       <Hero impacto={impacto} sesionActiva={sesionActiva} />
-      {impacto?.admin && <AvisoAdmin admin={impacto.admin} />}
       <QueEs />
       <Categorias impacto={impacto} />
       <ComoFunciona />
