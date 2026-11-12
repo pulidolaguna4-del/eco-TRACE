@@ -109,6 +109,11 @@ export async function eliminarConDatos(usuarioId, adminId) {
     where: { ...delUsuarioOSusPuntos, foto_url: { not: null } },
     select: { foto_url: true }
   })
+  // Sus regalos (y sus chats) se borran en cascada; las fotos, a mano
+  const regalos = await prisma.regalo.findMany({
+    where: { usuario_id: usuario.id },
+    select: { fotos: true }
+  })
 
   try {
     await prisma.$transaction([
@@ -125,7 +130,7 @@ export async function eliminarConDatos(usuarioId, adminId) {
     throw new HttpError(500, 'No se pudo eliminar el usuario y sus datos relacionados')
   }
 
-  await borrarFotos(fotos.map((f) => f.foto_url))
+  await borrarFotos([...fotos.map((f) => f.foto_url), ...regalos.flatMap((r) => r.fotos)])
 
   for (const { punto_id } of calificados) {
     await recalcularCalificacion(punto_id)

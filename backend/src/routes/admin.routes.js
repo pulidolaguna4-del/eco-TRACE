@@ -1,11 +1,13 @@
 import { Router } from 'express'
 
 import * as ctrl from '../controllers/admin.controller.js'
+import * as regalos from '../controllers/regalos.controller.js'
 import { requireAdmin, requireAuth } from '../middlewares/auth.js'
 import { validate } from '../middlewares/validate.js'
 import { idParam } from '../validators/comunes.js'
 import { revisionEntregaSchema } from '../validators/entregas.schemas.js'
 import { rechazoPuntoSchema } from '../validators/puntos.schemas.js'
+import { ocultarRegaloSchema, revisionReporteRegaloSchema } from '../validators/regalos.schemas.js'
 import { revisionReporteSchema } from '../validators/reportes.schemas.js'
 
 const router = Router()
@@ -17,6 +19,7 @@ const usuarioId = validate({ params: idParam('usuario_id') })
 const puntoId = validate({ params: idParam('punto_id') })
 const reporteId = validate({ params: idParam('reporte_id') })
 const entregaId = validate({ params: idParam('entrega_id') })
+const regaloId = validate({ params: idParam('regalo_id') })
 
 // Usuarios
 router.get('/usuarios', ctrl.listarUsuarios)
@@ -38,5 +41,11 @@ router.put('/entregas/:entrega_id/revisar', entregaId, validate({ body: revision
 // Reportes
 router.get('/reportes', ctrl.listarReportes)
 router.put('/reportes/:reporte_id/revisar', reporteId, validate({ body: revisionReporteSchema }), ctrl.revisarReporte)
+
+// Regalos (marketplace gratuito)
+router.get('/regalos/reportes', regalos.listarReportesAdmin)
+router.put('/regalos/reportes/:reporte_id/revisar', reporteId, validate({ body: revisionReporteRegaloSchema }), regalos.revisarReporteAdmin)
+router.put('/regalos/:regalo_id/ocultar', regaloId, validate({ body: ocultarRegaloSchema }), regalos.ocultarAdmin)
+router.delete('/regalos/:regalo_id', regaloId, regalos.eliminarAdmin)
 
 export default router
