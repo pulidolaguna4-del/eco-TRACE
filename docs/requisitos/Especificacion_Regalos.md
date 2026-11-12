@@ -214,8 +214,8 @@ Todo con el estilo del rediseño: etiqueta superior verde, títulos `font-black`
 
 > Para retomar: `git switch feat/marketplace-gratuito && git pull`, luego `docker compose up -d --build`. Esto instala `socket.io` y aplica la migración `5_regalos`.
 
-### ✅ Hecho (backend, sin probar todavía en ejecución)
-Solo se revisó la sintaxis con `node --check` y el esquema con `prisma validate`. **Aún no se ha probado con el servidor corriendo.**
+### ✅ Hecho (backend)
+La migración `5_regalos` ya está aplicada en Docker y pasan las pruebas básicas: `GET /regalos` → `[]`, `GET /conversaciones` sin sesión → 401, regalo inexistente → 404, y `/impacto` incluye `regalos`. **Falta probar el flujo completo con usuarios** (paso 1).
 
 | Archivo | Qué hace |
 |---|---|
