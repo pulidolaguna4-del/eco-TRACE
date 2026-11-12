@@ -1,412 +1,136 @@
-import { useEffect, useState, useRef } from 'react'
+// =========================================================
+// PANEL DE ADMINISTRACIÓN
+// =========================================================
+// - Barra lateral (como el panel del mapa) con las bandejas de
+//   moderación y gestión; en pantallas pequeñas se vuelve una tira
+//   horizontal desplazable.
+// - Resumen con las tareas pendientes e indicadores.
+// - Cada sección vive en components/admin. Aquí quedan el estado y
+//   las llamadas a la API.
+// - Los avisos de éxito y error flotan abajo a la derecha y las
+//   eliminaciones se confirman en un modal.
+
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  motion,
-  AnimatePresence,
-  useReducedMotion
-} from 'framer-motion'
-import {
-  normalizarPunto,
-  formatearMensajeError,
-  ESTADOS_CONSERVACION,
-  ESTADOS_ENTREGA
-} from '../utils/puntoUtils'
-import { CategoriasBadges } from '../components/CategoriasBadges'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+
+import { normalizarPunto, formatearMensajeError } from '../utils/puntoUtils'
+import { anilloFoco, Avatar, Avisos, BotonAccion, ModalConfirmacion, ModalRechazo } from '../components/admin/ui'
+import SeccionResumen from '../components/admin/SeccionResumen'
+import SeccionPendientes from '../components/admin/SeccionPendientes'
+import SeccionPuntos from '../components/admin/SeccionPuntos'
+import SeccionEntregas from '../components/admin/SeccionEntregas'
+import SeccionUsuarios from '../components/admin/SeccionUsuarios'
+import SeccionReportes from '../components/admin/SeccionReportes'
 
 const API_URL = 'http://127.0.0.1:8000'
 
-// =========================================================
-// HOOK CONTADOR
-// =========================================================
+const GRUPOS = [
+  {
+    nombre: 'General',
+    secciones: [{ id: 'resumen', texto: 'Resumen', icono: '📊' }]
+  },
+  {
+    nombre: 'Moderación',
+    secciones: [
+      { id: 'pendientes', texto: 'Puntos por aprobar', icono: '⏳' },
+      { id: 'entregas', texto: 'Entregas', icono: '♻️' },
+      { id: 'reportes', texto: 'Reportes', icono: '🚩' }
+    ]
+  },
+  {
+    nombre: 'Gestión',
+    secciones: [
+      { id: 'puntos', texto: 'Todos los puntos', icono: '📍' },
+      { id: 'usuarios', texto: 'Usuarios', icono: '👥' }
+    ]
+  }
+]
 
-function useCountUp(valorFinal, duracion = 1) {
-  const [conteo, setConteo] = useState(0)
-  const inicioRef = useRef(null)
-  const prefiereReducido = useReducedMotion()
+const ENCABEZADOS = {
+  resumen: { grupo: 'Panel de administración', titulo: 'Resumen', texto: 'Lo que pasa en eco-TRACE y lo que espera tu revisión.' },
+  pendientes: { grupo: 'Moderación', titulo: 'Puntos por aprobar', texto: 'Revisa cada propuesta antes de publicarla en el mapa. Quien la envió recibe un correo con tu decisión.' },
+  entregas: { grupo: 'Moderación', titulo: 'Entregas', texto: 'Verifica las entregas y donaciones. Solo las verificadas suman al impacto.' },
+  reportes: { grupo: 'Moderación', titulo: 'Reportes', texto: 'Avisos de la comunidad sobre información incorrecta de un punto.' },
+  puntos: { grupo: 'Gestión', titulo: 'Todos los puntos', texto: 'Consulta todos los puntos ecológicos y atiende los que están en revisión prioritaria.' },
+  usuarios: { grupo: 'Gestión', titulo: 'Usuarios', texto: 'Administra las cuentas y los permisos de administrador.' }
+}
 
-  useEffect(() => {
-    if (prefiereReducido) {
-      setConteo(valorFinal)
-      return
-    }
-
-    let idAnimacion
-    const inicio = conteo
-
-    const animar = (marcaTiempo) => {
-      if (!inicioRef.current) {
-        inicioRef.current = marcaTiempo
-      }
-
-      const progreso = marcaTiempo - inicioRef.current
-
-      const fraccion = Math.min(
-        progreso / (duracion * 1000),
-        1
-      )
-
-      const easingOut =
-        1 - Math.pow(1 - fraccion, 2)
-
-      const valorActual = Math.floor(
-        inicio +
-          (valorFinal - inicio) * easingOut
-      )
-
-      setConteo(valorActual)
-
-      if (fraccion < 1) {
-        idAnimacion =
-          requestAnimationFrame(animar)
-      }
-    }
-
-    idAnimacion =
-      requestAnimationFrame(animar)
-
-    return () => {
-      cancelAnimationFrame(idAnimacion)
-      inicioRef.current = null
-    }
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [valorFinal, duracion, prefiereReducido])
-
-  return conteo
+function leerUsuario() {
+  try {
+    return JSON.parse(localStorage.getItem('usuario') || 'null')
+  } catch {
+    return null
+  }
 }
 
 // =========================================================
-// BADGE
+// BARRA LATERAL
 // =========================================================
 
-function Badge({ tipo, texto }) {
-  const estilos = {
-    pendiente:
-      'bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-400 border-amber-200 dark:border-amber-900/30',
-
-    aprobado:
-      'bg-green-50 dark:bg-green-950/20 text-[#218739] dark:text-[#2fa350] border-green-200 dark:border-green-900/30',
-
-    rechazado:
-      'bg-red-50 dark:bg-red-950/20 text-[#d93025] dark:text-[#ef5350] border-red-200 dark:border-red-900/30',
-
-    admin:
-      'bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-900/30',
-
-    usuario:
-      'bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-900/30',
-
-    info:
-      'bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-900/30'
-  }
-
-  const iconos = {
-    pendiente: '⏳',
-    aprobado: '✓',
-    rechazado: '✕',
-    admin: '🛡️',
-    usuario: '👤',
-    info: 'ℹ️'
-  }
+function BarraLateral({ usuario, seccion, onSeccion, contadores }) {
+  const reducido = useReducedMotion()
 
   return (
-    <span
-      className={`
-        inline-flex items-center gap-1.5
-        px-2.5 py-0.5
-        rounded-full
-        text-[11px]
-        font-bold
-        border
-        uppercase
-        tracking-wider
-        ${estilos[tipo] || estilos.info}
-      `}
-    >
-      <span>{iconos[tipo]}</span>
-      <span>{texto}</span>
-    </span>
-  )
-}
-
-// =========================================================
-// EMPTY STATE
-// =========================================================
-
-function EmptyState({
-  titulo,
-  descripcion,
-  icono = '🎉'
-}) {
-  return (
-    <div className="py-16 text-center">
-      <span className="text-4xl block mb-3">
-        {icono}
-      </span>
-
-      <h4 className="text-lg font-bold text-gray-800 dark:text-[#f2f5f3]">
-        {titulo}
-      </h4>
-
-      <p className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-1 max-w-sm mx-auto px-4">
-        {descripcion}
-      </p>
-    </div>
-  )
-}
-
-// =========================================================
-// BOTÓN DE CARGA
-// =========================================================
-
-function LoadingButton({
-  cargando,
-  texto,
-  textoCargando,
-  onClick,
-  variante = 'primario',
-  deshabilitado = false
-}) {
-  const prefiereReducido = useReducedMotion()
-
-  const estilosVariante = {
-    primario:
-      'bg-gradient-to-r from-[#218739] to-[#39aa53] hover:from-[#176b2b] hover:to-[#2b833e] text-white',
-
-    peligro:
-      'bg-gradient-to-r from-[#d93025] to-[#f44336] hover:from-[#b3261e] hover:to-[#d32f2f] text-white',
-
-    secundario:
-      'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-[#f2f5f3]',
-
-    admin:
-      'bg-purple-600 hover:bg-purple-700 text-white'
-  }
-
-  return (
-    <motion.button
-      type="button"
-      onClick={onClick}
-      disabled={cargando || deshabilitado}
-      whileHover={
-        prefiereReducido || cargando || deshabilitado
-          ? {}
-          : { scale: 1.03 }
-      }
-      whileTap={
-        prefiereReducido || cargando || deshabilitado
-          ? {}
-          : { scale: 0.97 }
-      }
-      className={`
-        px-3.5 py-1.5
-        font-bold
-        rounded-xl
-        text-xs
-        transition-all
-        flex
-        items-center
-        justify-center
-        gap-1.5
-        cursor-pointer
-        disabled:opacity-50
-        disabled:cursor-not-allowed
-        ${estilosVariante[variante]}
-      `}
-    >
-      {cargando ? (
-        <>
-          <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-          <span>
-            {textoCargando || 'Procesando...'}
-          </span>
-        </>
-      ) : (
-        <span>{texto}</span>
-      )}
-    </motion.button>
-  )
-}
-
-// =========================================================
-// MODAL DE RECHAZO (PIDE EL MOTIVO)
-// =========================================================
-
-const MOTIVO_RECHAZO_MIN = 5
-const MOTIVO_RECHAZO_MAX = 500
-
-// Sirve para rechazar puntos y entregas: `punto` es lo que se muestra
-// en la tarjeta (nombre y dirección) y los textos se pueden cambiar.
-function ModalRechazo({
-  punto,
-  procesando,
-  onCancelar,
-  onConfirmar,
-  titulo = 'Rechazar punto',
-  subtitulo = 'El motivo se le enviará al usuario que propuso el punto.',
-  etiqueta = 'Punto seleccionado',
-  textoConfirmar = 'Rechazar punto',
-  placeholder = 'Ej.: la ubicación no corresponde a la dirección indicada...'
-}) {
-  const [motivo, setMotivo] = useState('')
-  const [errorMotivo, setErrorMotivo] = useState('')
-
-  const confirmar = (evento) => {
-    evento.preventDefault()
-
-    const motivoLimpio = motivo.trim()
-
-    if (motivoLimpio.length < MOTIVO_RECHAZO_MIN) {
-      setErrorMotivo(
-        `Explica el motivo con al menos ${MOTIVO_RECHAZO_MIN} caracteres`
-      )
-      return
-    }
-
-    onConfirmar(motivoLimpio)
-  }
-
-  // Cerrar con Escape
-  useEffect(() => {
-    const alPresionarTecla = (evento) => {
-      if (evento.key === 'Escape' && !procesando) onCancelar()
-    }
-    window.addEventListener('keydown', alPresionarTecla)
-    return () => window.removeEventListener('keydown', alPresionarTecla)
-  }, [procesando, onCancelar])
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.2 }}
-      className="fixed inset-0 z-[2000] bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="titulo-modal-rechazo"
-      onClick={() => !procesando && onCancelar()}
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 15 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 15 }}
-        transition={{ duration: 0.2 }}
-        className="w-full max-w-md bg-white dark:bg-[#1a2320] rounded-3xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-
-        {/* ENCABEZADO */}
-        <div className="relative px-6 pt-6 pb-4 border-b border-gray-100 dark:border-gray-700">
-
-          <button
-            type="button"
-            onClick={onCancelar}
-            disabled={procesando}
-            className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition disabled:opacity-50"
-            aria-label="Cerrar"
-          >
-            ✕
-          </button>
-
-          <div className="flex items-center gap-3 pr-10">
-            <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-2xl">
-              ✕
-            </div>
-
-            <div>
-              <h2
-                id="titulo-modal-rechazo"
-                className="text-xl font-extrabold text-gray-900 dark:text-white"
-              >
-                {titulo}
-              </h2>
-
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {subtitulo}
-              </p>
-            </div>
-          </div>
+    <aside className="lg:w-64 shrink-0 lg:sticky lg:top-24 lg:self-start space-y-5">
+      {/* Tarjeta del administrador (escritorio) */}
+      <div className="hidden lg:flex items-center gap-3 p-4 rounded-2xl bg-white dark:bg-[#1a2320] border border-gray-100 dark:border-gray-800/60 shadow-xs">
+        <Avatar nombre={usuario?.nombre} admin />
+        <div className="min-w-0">
+          <p className="text-sm font-extrabold text-gray-900 dark:text-white truncate">{usuario?.nombre}</p>
+          <p className="text-[11px] font-extrabold uppercase tracking-wider text-amber-700 dark:text-amber-400">👑 Administración</p>
         </div>
+      </div>
 
-        {/* CONTENIDO */}
-        <form onSubmit={confirmar} className="px-6 py-5 space-y-5">
-
-          <div className="rounded-2xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/40 p-4">
-            <p className="text-[11px] uppercase tracking-wide font-bold text-red-700 dark:text-red-400 mb-1">
-              {etiqueta}
-            </p>
-
-            <p className="text-base font-extrabold text-gray-900 dark:text-white">
-              {punto.nombre}
-            </p>
-
-            {punto.direccion && (
-              <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
-                📍 {punto.direccion}
+      <nav aria-label="Secciones del panel" className="-mx-4 px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 overflow-x-auto lg:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex lg:flex-col gap-1 lg:gap-6 w-max lg:w-auto pb-1 lg:pb-0">
+          {GRUPOS.map((grupo) => (
+            <div key={grupo.nombre} className="flex lg:flex-col gap-1">
+              <p className="hidden lg:block px-3 mb-1 text-[11px] font-extrabold uppercase tracking-[0.18em] text-gray-500 dark:text-[#a8b3ae]">
+                {grupo.nombre}
               </p>
-            )}
-          </div>
-
-          <div>
-            <label
-              htmlFor="motivo-rechazo"
-              className="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2"
-            >
-              Motivo del rechazo *
-            </label>
-
-            <textarea
-              id="motivo-rechazo"
-              value={motivo}
-              onChange={(e) => {
-                setMotivo(e.target.value)
-                setErrorMotivo('')
-              }}
-              maxLength={MOTIVO_RECHAZO_MAX}
-              rows={4}
-              autoFocus
-              disabled={procesando}
-              placeholder={placeholder}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition resize-none"
-            />
-
-            <div className="flex justify-between items-center mt-1.5">
-              <p className={`text-[11px] ${errorMotivo ? 'text-red-500 font-bold' : 'text-gray-500 dark:text-gray-400'}`}>
-                {errorMotivo || 'Indica qué debe corregir el usuario.'}
-              </p>
-
-              <p className="text-[10px] font-bold text-gray-400">
-                {motivo.length}/{MOTIVO_RECHAZO_MAX}
-              </p>
+              {grupo.secciones.map((s) => {
+                const activo = seccion === s.id
+                const contador = contadores[s.id]
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => onSeccion(s.id)}
+                    aria-current={activo ? 'page' : undefined}
+                    className={`relative shrink-0 flex items-center gap-3 min-h-11 px-3.5 lg:px-3 rounded-xl text-sm font-bold whitespace-nowrap cursor-pointer transition-colors ${anilloFoco} ${
+                      activo
+                        ? 'text-[#176b2b] dark:text-[#2fa350]'
+                        : 'text-gray-600 dark:text-[#a8b3ae] hover:text-gray-900 dark:hover:text-white hover:bg-white/70 dark:hover:bg-[#1a2320]/60'
+                    }`}
+                  >
+                    {activo && (
+                      <motion.span
+                        layoutId="admin-seccion-activa"
+                        transition={reducido ? { duration: 0 } : { type: 'spring', stiffness: 380, damping: 32 }}
+                        className="absolute inset-0 rounded-xl bg-white dark:bg-[#1a2320] border border-[#218739]/15 dark:border-gray-800/60 shadow-xs"
+                      />
+                    )}
+                    <span className="relative text-base" aria-hidden="true">{s.icono}</span>
+                    <span className="relative lg:flex-1 text-left">{s.texto}</span>
+                    {contador?.valor > 0 && (
+                      <span
+                        className={`relative min-w-6 h-6 px-1.5 rounded-full text-[11px] font-black flex items-center justify-center tabular-nums ${
+                          contador.tono === 'red' ? 'bg-red-600 text-white' : contador.tono === 'amber' ? 'bg-amber-400 text-amber-950' : 'bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-[#dce4e0]'
+                        }`}
+                      >
+                        {contador.valor}
+                        <span className="sr-only"> {contador.descripcion}</span>
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
             </div>
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={onCancelar}
-              disabled={procesando}
-              className="px-4 py-2 rounded-xl text-xs font-bold bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-[#f2f5f3] transition disabled:opacity-50"
-            >
-              Cancelar
-            </button>
-
-            <button
-              type="submit"
-              disabled={procesando}
-              className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#d93025] to-[#f44336] hover:from-[#b3261e] hover:to-[#d32f2f] transition disabled:opacity-50 flex items-center gap-1.5"
-            >
-              {procesando && (
-                <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-              )}
-              {procesando ? 'Rechazando...' : textoConfirmar}
-            </button>
-          </div>
-
-        </form>
-      </motion.div>
-    </motion.div>
+          ))}
+        </div>
+      </nav>
+    </aside>
   )
 }
 
@@ -415,591 +139,219 @@ function ModalRechazo({
 // =========================================================
 
 function Admin() {
-
   const navigate = useNavigate()
+  const reducido = useReducedMotion()
+  const usuarioSesion = leerUsuario()
 
-  const prefiereReducido = useReducedMotion()
-
-  const [puntosPendientes, setPuntosPendientes] =
-    useState([])
-
-  const [usuarios, setUsuarios] =
-    useState([])
-
-  const [puntosAprobados, setPuntosAprobados] =
-    useState([])
-
-  const [todosLosPuntos, setTodosLosPuntos] =
-    useState([])
-
-  const [puntoEliminandoId, setPuntoEliminandoId] =
-    useState(null)
-
-  // Punto señalado por reseñas negativas que se está marcando como revisado
-  const [puntoRevisandoId, setPuntoRevisandoId] =
-    useState(null)
-
-  // Reportes enviados por la comunidad sobre puntos ecológicos.
-  const [reportes, setReportes] = useState([])
+  // Datos
+  const [puntosPendientes, setPuntosPendientes] = useState([])
+  const [todosLosPuntos, setTodosLosPuntos] = useState([])
+  const [usuarios, setUsuarios] = useState([])
   const [entregas, setEntregas] = useState([])
-  const [observacionesReportes, setObservacionesReportes] = useState({})
-  const [reporteProcesandoId, setReporteProcesandoId] = useState(null)
+  const [reportes, setReportes] = useState([])
 
-  // Verificación de entregas
+  // Sesión y carga
+  const [esAdmin, setEsAdmin] = useState(false)
+  const [miUsuarioId, setMiUsuarioId] = useState(null)
+  const [cargando, setCargando] = useState(true)
+  const [ultimaActualizacion, setUltimaActualizacion] = useState(null)
+  const [mensaje, setMensaje] = useState('')
+  const [error, setError] = useState('')
+
+  // Procesos en curso
+  const [procesandoId, setProcesandoId] = useState(null)
+  const [puntoEliminandoId, setPuntoEliminandoId] = useState(null)
+  const [puntoRevisandoId, setPuntoRevisandoId] = useState(null)
   const [entregaProcesandoId, setEntregaProcesandoId] = useState(null)
+  const [reporteProcesandoId, setReporteProcesandoId] = useState(null)
+  const [usuarioProcesandoId, setUsuarioProcesandoId] = useState(null)
+
+  // Modales
+  const [puntoARechazar, setPuntoARechazar] = useState(null)
   const [entregaARechazar, setEntregaARechazar] = useState(null)
+  const [confirmacion, setConfirmacion] = useState(null) // { tipo: 'punto' | 'usuario', elemento }
+
+  // Navegación, filtros y búsquedas
+  const [seccion, setSeccion] = useState('resumen')
+  const [filtroPuntos, setFiltroPuntos] = useState('todos')
+  const [busquedaPuntos, setBusquedaPuntos] = useState('')
   const [filtroEntregas, setFiltroEntregas] = useState('todas')
+  const [busquedaEntregas, setBusquedaEntregas] = useState('')
+  const [filtroUsuarios, setFiltroUsuarios] = useState('todos')
+  const [busquedaUsuarios, setBusquedaUsuarios] = useState('')
+  const [filtroReportes, setFiltroReportes] = useState('pendiente')
+  const [observacionesReportes, setObservacionesReportes] = useState({})
 
-  const [cargando, setCargando] =
-    useState(true)
+  const obtenerCreador = (usuarioId) => usuarios.find((u) => u.id === usuarioId)
 
-  const [mensaje, setMensaje] =
-    useState('')
+  // Los avisos de éxito se ocultan solos
+  useEffect(() => {
+    if (!mensaje) return
+    const id = setTimeout(() => setMensaje(''), 4500)
+    return () => clearTimeout(id)
+  }, [mensaje])
 
-  const [error, setError] =
-    useState('')
+  const avisar = (texto) => {
+    setError('')
+    setMensaje(texto)
+  }
 
-  const [procesandoId, setProcesandoId] =
-    useState(null)
-
-  // Punto que se está rechazando (abre el modal del motivo)
-  const [puntoARechazar, setPuntoARechazar] =
-    useState(null)
-
-  const [usuarioProcesandoId, setUsuarioProcesandoId] =
-    useState(null)
-
-  const [esAdmin, setEsAdmin] =
-    useState(false)
-
-  const [miUsuarioId, setMiUsuarioId] =
-    useState(null)
-
-  const [pestañaActiva, setPestañaActiva] =
-    useState('pendientes')
-
-  // =========================================================
-  // BUSCAR CREADOR
-  // =========================================================
-
-  const obtenerCreador = (usuarioId) => {
-    return usuarios.find(
-      (usuario) => usuario.id === usuarioId
-    )
+  const fallar = (texto) => {
+    setMensaje('')
+    setError(texto)
   }
 
   // =========================================================
-  // VERIFICAR ADMIN
+  // PETICIONES
   // =========================================================
 
-  useEffect(() => {
-    const usuarioGuardado =
-      localStorage.getItem('usuario')
+  const peticion = async (ruta, { metodo = 'GET', cuerpo } = {}) => {
+    const token = localStorage.getItem('access_token')
+    if (!token) throw new Error('Tu sesión expiró. Vuelve a iniciar sesión.')
 
-    const token =
-      localStorage.getItem('access_token')
-
-    if (!token || !usuarioGuardado) {
-      setError(
-        'Debes iniciar sesión como administrador para acceder'
-      )
-
-      setCargando(false)
-      return
-    }
-
-    try {
-      const usuario =
-        JSON.parse(usuarioGuardado)
-
-      setMiUsuarioId(usuario.id)
-
-      if (!usuario.es_admin) {
-        setError(
-          'No tienes permisos de administrador'
-        )
-
-        setCargando(false)
-        return
-      }
-
-      setEsAdmin(true)
-
-      cargarDatosDashboard(token)
-
-    } catch (err) {
-      console.error(err)
-
-      setError(
-        'Error validando sesión'
-      )
-
-      setCargando(false)
-    }
-  }, [])
+    const respuesta = await fetch(`${API_URL}${ruta}`, {
+      method: metodo,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(cuerpo !== undefined ? { 'Content-Type': 'application/json' } : {})
+      },
+      ...(cuerpo !== undefined ? { body: JSON.stringify(cuerpo) } : {})
+    })
+    const datos = await respuesta.json().catch(() => null)
+    return { respuesta, datos }
+  }
 
   // =========================================================
   // CARGAR DATOS
   // =========================================================
 
-  const cargarDatosDashboard = async (
-    tokenProvisto
-  ) => {
-    const token =
-      tokenProvisto ||
-      localStorage.getItem('access_token')
+  const cargarDatos = useCallback(async () => {
+    setCargando(true)
+    setError('')
 
-    if (!token) {
-      setError('No existe una sesión activa')
+    try {
+      const [pendientes, listaUsuarios, puntos, listaReportes, listaEntregas] = await Promise.all([
+        peticion('/admin/puntos/pendientes'),
+        peticion('/admin/usuarios'),
+        peticion('/admin/puntos'),
+        peticion('/admin/reportes').catch((e) => ({ fallo: e })),
+        peticion('/admin/entregas').catch((e) => ({ fallo: e }))
+      ])
+
+      // Obligatorios: sin ellos el panel no sirve
+      for (const [r, texto] of [
+        [pendientes, 'los puntos pendientes'],
+        [listaUsuarios, 'los usuarios'],
+        [puntos, 'los puntos']
+      ]) {
+        if (r.respuesta.status === 401 || r.respuesta.status === 403) {
+          throw new Error('Tu sesión no tiene permisos de administrador. Vuelve a iniciar sesión.')
+        }
+        if (!r.respuesta.ok) {
+          throw new Error(formatearMensajeError(r.datos?.detail, `No se pudieron cargar ${texto}.`))
+        }
+      }
+
+      setPuntosPendientes(pendientes.datos.map(normalizarPunto))
+      setUsuarios(listaUsuarios.datos)
+      setTodosLosPuntos(puntos.datos.map(normalizarPunto))
+
+      // Opcionales: si fallan, el resto del panel sigue funcionando
+      const avisos = []
+
+      if (listaReportes.respuesta?.ok && Array.isArray(listaReportes.datos)) {
+        setReportes(listaReportes.datos)
+      } else {
+        setReportes([])
+        avisos.push(formatearMensajeError(listaReportes.datos?.detail, 'No se pudieron cargar los reportes.'))
+      }
+
+      if (listaEntregas.respuesta?.ok && Array.isArray(listaEntregas.datos)) {
+        setEntregas(listaEntregas.datos)
+      } else {
+        setEntregas([])
+        avisos.push(formatearMensajeError(listaEntregas.datos?.detail, 'No se pudieron cargar las entregas.'))
+      }
+
+      if (avisos.length) setError(avisos.join(' '))
+      setUltimaActualizacion(new Date())
+    } catch (err) {
+      console.error('Error cargando el panel:', err)
+      setError(err.message || 'No pudimos conectar con el servidor.')
+    } finally {
+      setCargando(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Verificar que la sesión sea de un administrador
+  useEffect(() => {
+    const token = localStorage.getItem('access_token')
+
+    if (!token || !usuarioSesion) {
+      setError('Inicia sesión con una cuenta de administrador para entrar al panel.')
       setCargando(false)
       return
     }
 
-    try {
-      setCargando(true)
-      setError('')
-      setMensaje('')
+    setMiUsuarioId(usuarioSesion.id)
 
-      // -----------------------------------------------------
-      // PUNTOS PENDIENTES
-      // -----------------------------------------------------
-
-      const resPendientes =
-        await fetch(
-          `${API_URL}/admin/puntos/pendientes`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`
-            }
-          }
-        )
-
-      if (
-        resPendientes.status === 401 ||
-        resPendientes.status === 403
-      ) {
-        throw new Error(
-          'Sesión no autorizada o sin permisos de administrador'
-        )
-      }
-
-      if (!resPendientes.ok) {
-        throw new Error(
-          'Error al cargar puntos pendientes'
-        )
-      }
-
-      const datosPendientes =
-        await resPendientes.json()
-
-      const pendientesNormalizados =
-        datosPendientes.map(normalizarPunto)
-
-      setPuntosPendientes(
-        pendientesNormalizados
-      )
-
-      // -----------------------------------------------------
-      // USUARIOS
-      // -----------------------------------------------------
-
-      const resUsuarios =
-        await fetch(
-          `${API_URL}/admin/usuarios`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`
-            }
-          }
-        )
-
-      if (
-        resUsuarios.status === 401 ||
-        resUsuarios.status === 403
-      ) {
-        throw new Error(
-          'No tienes autorización para consultar los usuarios'
-        )
-      }
-
-      if (!resUsuarios.ok) {
-        throw new Error(
-          'Error al cargar usuarios'
-        )
-      }
-
-      const datosUsuarios =
-        await resUsuarios.json()
-
-      setUsuarios(datosUsuarios)
-
-      // -----------------------------------------------------
-      // PUNTOS APROBADOS
-      // -----------------------------------------------------
-
-      const resAprobados =
-        await fetch(
-          `${API_URL}/puntos`
-        )
-
-      if (resAprobados.ok) {
-        const datosAprobados =
-          await resAprobados.json()
-
-        const aprobadosNormalizados =
-          datosAprobados.map(normalizarPunto)
-
-        setPuntosAprobados(
-          aprobadosNormalizados
-        )
-      }
-
-      // -----------------------------------------------------
-      // TODOS LOS PUNTOS - ADMIN
-      // -----------------------------------------------------
-
-      const resTodosLosPuntos =
-        await fetch(
-          `${API_URL}/admin/puntos`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`
-            }
-          }
-        )
-
-      if (
-        resTodosLosPuntos.status === 401 ||
-        resTodosLosPuntos.status === 403
-      ) {
-        throw new Error(
-          'No tienes autorización para consultar todos los puntos'
-        )
-      }
-
-      if (!resTodosLosPuntos.ok) {
-        throw new Error(
-          'Error al cargar todos los puntos'
-        )
-      }
-
-      const datosTodosLosPuntos =
-        await resTodosLosPuntos.json()
-
-      const puntosNormalizados =
-        datosTodosLosPuntos.map(normalizarPunto)
-
-      setTodosLosPuntos(
-        puntosNormalizados
-      )
-
-      // -----------------------------------------------------
-      // REPORTES DE LA COMUNIDAD
-      // -----------------------------------------------------
-
-      try {
-        const resReportes = await fetch(
-          `${API_URL}/admin/reportes`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`
-            }
-          }
-        )
-
-        if (!resReportes.ok) {
-          let detalle = null
-
-          try {
-            detalle = await resReportes.json()
-          } catch {
-            detalle = null
-          }
-
-          throw new Error(
-            detalle?.detail ||
-            'No se pudieron cargar los reportes'
-          )
-        }
-
-        const datosReportes =
-          await resReportes.json()
-
-        setReportes(
-          Array.isArray(datosReportes)
-            ? datosReportes
-            : []
-        )
-
-      } catch (errorReportes) {
-
-        console.error(
-          'Error cargando reportes:',
-          errorReportes
-        )
-
-        setReportes([])
-
-        setError((mensajeActual) =>
-          mensajeActual ||
-          `${errorReportes.message}. Verifica que la ruta /admin/reportes esté implementada en el backend.`
-        )
-      }
-  
-      // -----------------------------------------------------
-      // ENTREGAS REGISTRADAS
-      // -----------------------------------------------------
-
-      try {
-        const resEntregas = await fetch(
-          `${API_URL}/admin/entregas`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`
-            }
-          }
-        )
-
-        if (!resEntregas.ok) {
-          let detalle = null
-
-          try {
-            detalle = await resEntregas.json()
-          } catch {
-            detalle = null
-          }
-
-          throw new Error(
-            detalle?.detail ||
-            'No se pudieron cargar las entregas'
-          )
-        }
-
-        const datosEntregas =
-          await resEntregas.json()
-
-        setEntregas(
-          Array.isArray(datosEntregas)
-            ? datosEntregas
-            : []
-        )
-
-      } catch (errorEntregas) {
-
-        console.error(
-          'Error cargando entregas:',
-          errorEntregas
-        )
-
-        setEntregas([])
-
-        setError((mensajeActual) =>
-          mensajeActual ||
-          `${errorEntregas.message}. Verifica que la ruta /admin/entregas esté implementada en el backend.`
-        )
-      }
-
-    } catch (err) {
-
-      console.error(
-        'Error cargando dashboard:',
-        err
-      )
-
-      setError(
-        err.message ||
-        'Error al conectar con el servidor'
-      )
-
-    } finally {
+    if (!usuarioSesion.es_admin) {
+      setError('Tu cuenta no tiene permisos de administrador.')
       setCargando(false)
+      return
     }
-  }
+
+    setEsAdmin(true)
+    cargarDatos()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // =========================================================
   // APROBAR / RECHAZAR PUNTO
   // =========================================================
 
-  // Devuelve true si el cambio se guardó correctamente
-  const cambiarEstado = async (
-    puntoId,
-    accion,
-    motivoRechazo = null
-  ) => {
-
-    const token =
-      localStorage.getItem('access_token')
-
-    if (!token) {
-      setError(
-        'Tu sesión ha expirado'
-      )
-      return
-    }
-
+  // Devuelve true si el cambio se guardó
+  const cambiarEstado = async (puntoId, accion, motivoRechazo = null) => {
     try {
-
       setProcesandoId(puntoId)
-      setError('')
-      setMensaje('')
 
-      const respuesta =
-        await fetch(
-          `${API_URL}/admin/puntos/${puntoId}/${accion}`,
-          {
-            method: 'PUT',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              ...(motivoRechazo
-                ? { 'Content-Type': 'application/json' }
-                : {})
-            },
-            ...(motivoRechazo
-              ? { body: JSON.stringify({ motivo_rechazo: motivoRechazo }) }
-              : {})
-          }
-        )
-
-      let datos = null
-
-      try {
-        datos = await respuesta.json()
-      } catch {
-        datos = null
-      }
-
-      if (!respuesta.ok) {
-        throw new Error(
-          datos?.detail ||
-          'No se pudo procesar el punto'
-        )
-      }
-
-      // -----------------------------------------------------
-      // ACTUALIZAR PUNTO APROBADO
-      // -----------------------------------------------------
-
-      if (accion === 'aprobar') {
-
-        setMensaje(
-          'Punto aprobado correctamente'
-        )
-
-        if (datos) {
-
-          const puntoNorm =
-            normalizarPunto(datos)
-
-          setPuntosAprobados(
-            (prev) => {
-
-              const yaExiste =
-                prev.some(
-                  (punto) =>
-                    punto.id === puntoNorm.id
-                )
-
-              if (yaExiste) {
-                return prev
-              }
-
-              return [
-                ...prev,
-                puntoNorm
-              ]
-            }
-          )
-
-          // Actualizar también la pestaña
-          // "Todos los puntos".
-          setTodosLosPuntos(
-            (prev) =>
-              prev.map(
-                (punto) =>
-                  punto.id === puntoNorm.id
-                    ? puntoNorm
-                    : punto
-              )
-          )
-        }
-      }
-
-      // -----------------------------------------------------
-      // ACTUALIZAR PUNTO RECHAZADO
-      // -----------------------------------------------------
-
-      if (accion === 'rechazar') {
-
-        setMensaje(
-          'Punto rechazado correctamente'
-        )
-
-        if (datos) {
-
-          const puntoNorm =
-            normalizarPunto(datos)
-
-          setTodosLosPuntos(
-            (prev) =>
-              prev.map(
-                (punto) =>
-                  punto.id === puntoNorm.id
-                    ? puntoNorm
-                    : punto
-              )
-          )
-        }
-      }
-
-      // -----------------------------------------------------
-      // QUITAR DE PENDIENTES
-      // -----------------------------------------------------
-
-      setPuntosPendientes(
-        (puntosActuales) =>
-          puntosActuales.filter(
-            (punto) =>
-              punto.id !== puntoId
-          )
+      const { respuesta, datos } = await peticion(
+        `/admin/puntos/${puntoId}/${accion}`,
+        { metodo: 'PUT', cuerpo: motivoRechazo ? { motivo_rechazo: motivoRechazo } : undefined }
       )
 
+      if (!respuesta.ok) throw new Error(formatearMensajeError(datos?.detail, 'No se pudo procesar el punto.'))
+
+      const anterior = puntosPendientes.find((p) => p.id === puntoId)
+      const actualizado = datos
+        ? normalizarPunto(datos)
+        : { ...anterior, estado: accion === 'aprobar' ? 'aprobado' : 'rechazado', motivo_rechazo: motivoRechazo }
+
+      setTodosLosPuntos((actuales) => {
+        const existe = actuales.some((p) => p.id === puntoId)
+        return existe ? actuales.map((p) => (p.id === puntoId ? actualizado : p)) : [...actuales, actualizado]
+      })
+      setPuntosPendientes((actuales) => actuales.filter((p) => p.id !== puntoId))
+
+      avisar(
+        accion === 'aprobar'
+          ? `"${actualizado.nombre}" ya está publicado en el mapa.`
+          : `Rechazaste "${actualizado.nombre}". Le avisaremos por correo a quien lo propuso.`
+      )
       return true
-
     } catch (err) {
-
-      console.error(
-        'Error cambiando estado:',
-        err
-      )
-
-      setError(
-        err.message ||
-        'No se pudo procesar el punto'
-      )
-
+      console.error('Error cambiando el estado del punto:', err)
+      fallar(err.message)
       return false
-
     } finally {
       setProcesandoId(null)
     }
   }
 
-  // =========================================================
-  // RECHAZAR PUNTO CON MOTIVO (desde el modal)
-  // =========================================================
-
   const confirmarRechazo = async (motivo) => {
     if (!puntoARechazar) return
-
-    const guardado = await cambiarEstado(
-      puntoARechazar.id,
-      'rechazar',
-      motivo
-    )
-
-    if (guardado) {
-      setPuntoARechazar(null)
-    }
+    if (await cambiarEstado(puntoARechazar.id, 'rechazar', motivo)) setPuntoARechazar(null)
   }
 
   // =========================================================
@@ -1007,179 +359,45 @@ function Admin() {
   // =========================================================
 
   const marcarPuntoRevisado = async (puntoId) => {
-    const token = localStorage.getItem('access_token')
-
-    if (!token) {
-      setError('Tu sesión ha expirado')
-      return
-    }
-
     try {
       setPuntoRevisandoId(puntoId)
-      setError('')
-      setMensaje('')
 
-      const respuesta = await fetch(
-        `${API_URL}/admin/puntos/${puntoId}/revision`,
-        {
-          method: 'PUT',
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      )
-
-      const datos = await respuesta.json().catch(() => null)
-
-      if (!respuesta.ok) {
-        throw new Error(
-          formatearMensajeError(datos?.detail, 'No se pudo marcar el punto como revisado')
-        )
-      }
+      const { respuesta, datos } = await peticion(`/admin/puntos/${puntoId}/revision`, { metodo: 'PUT' })
+      if (!respuesta.ok) throw new Error(formatearMensajeError(datos?.detail, 'No se pudo marcar el punto como revisado.'))
 
       const actualizado = normalizarPunto(datos)
-
-      setTodosLosPuntos((actuales) =>
-        actuales.map((p) => (p.id === puntoId ? actualizado : p))
-      )
-
-      setMensaje(`El punto "${actualizado.nombre}" quedó marcado como revisado`)
+      setTodosLosPuntos((actuales) => actuales.map((p) => (p.id === puntoId ? actualizado : p)))
+      avisar(`"${actualizado.nombre}" quedó marcado como revisado.`)
     } catch (err) {
       console.error(err)
-      setError(err.message)
+      fallar(err.message)
     } finally {
       setPuntoRevisandoId(null)
     }
   }
 
   // =========================================================
-  // ELIMINAR PUNTO
+  // ELIMINAR PUNTO (tras confirmar en el modal)
   // =========================================================
 
-  const eliminarPunto = async (
-    puntoId
-  ) => {
-
-    const token =
-      localStorage.getItem('access_token')
-
-    if (!token) {
-      setError(
-        'Tu sesión ha expirado'
-      )
-      return
-    }
-
-    const punto =
-      todosLosPuntos.find(
-        (item) =>
-          item.id === puntoId
-      )
-
-    const confirmar =
-      window.confirm(
-        `¿Seguro que quieres eliminar el punto "${punto?.nombre || 'este punto'}"?\n\nTambién se eliminarán las reseñas, reportes, entregas y relaciones con categorías asociadas a este punto.`
-      )
-
-    if (!confirmar) {
-      return
-    }
-
+  const eliminarPunto = async (puntoId) => {
     try {
-
       setPuntoEliminandoId(puntoId)
-      setError('')
-      setMensaje('')
 
-      const respuesta =
-        await fetch(
-          `${API_URL}/admin/puntos/${puntoId}`,
-          {
-            method: 'DELETE',
-            headers: {
-              Authorization: `Bearer ${token}`
-            }
-          }
-        )
+      const { respuesta, datos } = await peticion(`/admin/puntos/${puntoId}`, { metodo: 'DELETE' })
+      if (!respuesta.ok) throw new Error(formatearMensajeError(datos?.detail, 'No se pudo eliminar el punto.'))
 
-      let datos = null
+      setTodosLosPuntos((actuales) => actuales.filter((p) => p.id !== puntoId))
+      setPuntosPendientes((actuales) => actuales.filter((p) => p.id !== puntoId))
+      setReportes((actuales) => actuales.filter((r) => r.punto_id !== puntoId))
+      setEntregas((actuales) => actuales.filter((e) => e.punto_id !== puntoId))
 
-      try {
-        datos = await respuesta.json()
-      } catch {
-        datos = null
-      }
-
-      if (!respuesta.ok) {
-        throw new Error(
-          datos?.detail ||
-          'No se pudo eliminar el punto'
-        )
-      }
-
-      // -----------------------------------------------------
-      // QUITAR EL PUNTO DE TODOS LOS PUNTOS
-      // -----------------------------------------------------
-
-      setTodosLosPuntos(
-        (puntosActuales) =>
-          puntosActuales.filter(
-            (puntoActual) =>
-              puntoActual.id !== puntoId
-          )
-      )
-
-      // -----------------------------------------------------
-      // QUITAR EL PUNTO DE PENDIENTES
-      // -----------------------------------------------------
-
-      setPuntosPendientes(
-        (puntosActuales) =>
-          puntosActuales.filter(
-            (puntoActual) =>
-              puntoActual.id !== puntoId
-          )
-      )
-
-      // -----------------------------------------------------
-      // QUITAR EL PUNTO DE APROBADOS
-      // -----------------------------------------------------
-
-      setPuntosAprobados(
-        (puntosActuales) =>
-          puntosActuales.filter(
-            (puntoActual) =>
-              puntoActual.id !== puntoId
-          )
-      )
-
-      // -----------------------------------------------------
-      // QUITAR REPORTES DEL PUNTO DE LA VISTA
-      // -----------------------------------------------------
-
-      setReportes(
-        (reportesActuales) =>
-          reportesActuales.filter(
-            (reporte) =>
-              reporte.punto_id !== puntoId
-          )
-      )
-
-      setMensaje(
-        datos?.mensaje ||
-        'Punto eliminado correctamente'
-      )
-
+      avisar(datos?.mensaje || 'Eliminaste el punto.')
+      return true
     } catch (err) {
-
-      console.error(
-        'Error eliminando punto:',
-        err
-      )
-
-      setError(
-        err.message ||
-        'No se pudo eliminar el punto'
-      )
-
+      console.error('Error eliminando el punto:', err)
+      fallar(err.message)
+      return false
     } finally {
       setPuntoEliminandoId(null)
     }
@@ -1190,54 +408,21 @@ function Admin() {
   // =========================================================
 
   const revisarEntrega = async (entregaId, estado, observacion = null) => {
-    const token = localStorage.getItem('access_token')
-
-    if (!token) {
-      setError('Tu sesión ha expirado')
-      return false
-    }
-
     try {
       setEntregaProcesandoId(entregaId)
-      setError('')
-      setMensaje('')
 
-      const respuesta = await fetch(
-        `${API_URL}/admin/entregas/${entregaId}/revisar`,
-        {
-          method: 'PUT',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ estado, observacion_admin: observacion })
-        }
-      )
+      const { respuesta, datos } = await peticion(`/admin/entregas/${entregaId}/revisar`, {
+        metodo: 'PUT',
+        cuerpo: { estado, observacion_admin: observacion }
+      })
+      if (!respuesta.ok) throw new Error(formatearMensajeError(datos?.detail, 'No se pudo actualizar la entrega.'))
 
-      const datos = await respuesta.json().catch(() => null)
-
-      if (!respuesta.ok) {
-        throw new Error(
-          formatearMensajeError(datos?.detail, 'No se pudo actualizar la entrega')
-        )
-      }
-
-      setEntregas((actuales) =>
-        actuales.map((entrega) =>
-          entrega.id === entregaId ? datos : entrega
-        )
-      )
-
-      setMensaje(
-        estado === 'verificada'
-          ? 'Entrega verificada correctamente'
-          : 'Entrega rechazada correctamente'
-      )
-
+      setEntregas((actuales) => actuales.map((e) => (e.id === entregaId ? datos : e)))
+      avisar(estado === 'verificada' ? 'Verificaste la entrega. Ya suma al impacto.' : 'Rechazaste la entrega. El usuario verá el motivo en su historial.')
       return true
     } catch (err) {
       console.error(err)
-      setError(err.message)
+      fallar(err.message)
       return false
     } finally {
       setEntregaProcesandoId(null)
@@ -1246,483 +431,144 @@ function Admin() {
 
   const confirmarRechazoEntrega = async (motivo) => {
     if (!entregaARechazar) return
-
-    const guardado = await revisarEntrega(entregaARechazar.id, 'rechazada', motivo)
-
-    if (guardado) {
-      setEntregaARechazar(null)
-    }
+    if (await revisarEntrega(entregaARechazar.id, 'rechazada', motivo)) setEntregaARechazar(null)
   }
 
   // =========================================================
   // REVISAR / DESCARTAR REPORTE
   // =========================================================
 
-  const revisarReporte = async (
-    reporteId,
-    estado
-  ) => {
-
-    const token =
-      localStorage.getItem('access_token')
-
-    if (!token) {
-      setError(
-        'Tu sesión ha expirado'
-      )
+  const revisarReporte = async (reporteId, estado) => {
+    if (!['revisado', 'descartado'].includes(estado)) {
+      fallar('El estado solicitado para el reporte no es válido.')
       return
     }
 
-    if (
-      !['revisado', 'descartado']
-        .includes(estado)
-    ) {
-      setError(
-        'El estado solicitado para el reporte no es válido'
-      )
-      return
-    }
+    const observacion = (observacionesReportes[reporteId] || '').trim() || null
 
     try {
+      setReporteProcesandoId(reporteId)
 
-      setReporteProcesandoId(
-        reporteId
-      )
+      const { respuesta, datos } = await peticion(`/admin/reportes/${reporteId}/revisar`, {
+        metodo: 'PUT',
+        cuerpo: { estado, observacion_admin: observacion }
+      })
+      if (!respuesta.ok) throw new Error(formatearMensajeError(datos?.detail, 'No se pudo actualizar el reporte.'))
 
-      setError('')
-      setMensaje('')
-
-      const respuesta =
-        await fetch(
-          `${API_URL}/admin/reportes/${reporteId}/revisar`,
-          {
-            method: 'PUT',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              estado,
-              observacion_admin:
-                (
-                  observacionesReportes[
-                    reporteId
-                  ] || ''
-                ).trim() || null
-            })
-          }
+      setReportes((actuales) =>
+        actuales.map((r) =>
+          (r.id ?? r.reporte_id) === reporteId
+            ? { ...r, ...(datos && typeof datos === 'object' ? datos : {}), estado, observacion_admin: observacion }
+            : r
         )
-
-      let datos = null
-
-      try {
-        datos = await respuesta.json()
-      } catch {
-        datos = null
-      }
-
-      if (!respuesta.ok) {
-        throw new Error(
-          datos?.detail ||
-          'No se pudo actualizar el reporte'
-        )
-      }
-
-      setReportes(
-        (actuales) =>
-          actuales.map(
-            (reporte) => {
-
-              const idActual =
-                reporte.id ??
-                reporte.reporte_id
-
-              if (
-                idActual !== reporteId
-              ) {
-                return reporte
-              }
-
-              return {
-                ...reporte,
-                ...(datos &&
-                typeof datos === 'object'
-                  ? datos
-                  : {}),
-                estado,
-                observacion_admin:
-                  (
-                    observacionesReportes[
-                      reporteId
-                    ] || ''
-                  ).trim() || null
-              }
-            }
-          )
       )
+      setObservacionesReportes(({ [reporteId]: _quitada, ...resto }) => resto)
 
-      setObservacionesReportes(
-        (actuales) => {
-
-          const nuevas = {
-            ...actuales
-          }
-
-          delete nuevas[reporteId]
-
-          return nuevas
-        }
-      )
-
-      setMensaje(
-        estado === 'revisado'
-          ? 'Reporte marcado como revisado correctamente'
-          : 'Reporte descartado correctamente'
-      )
-
+      avisar(estado === 'revisado' ? 'Marcaste el reporte como revisado.' : 'Descartaste el reporte.')
     } catch (err) {
-
-      console.error(
-        'Error revisando reporte:',
-        err
-      )
-
-      setError(
-        err.message ||
-        'No se pudo actualizar el reporte'
-      )
-
+      console.error('Error revisando el reporte:', err)
+      fallar(err.message)
     } finally {
       setReporteProcesandoId(null)
     }
   }
 
   // =========================================================
-  // CAMBIAR ADMIN
+  // CAMBIAR ROL DE ADMINISTRADOR
   // =========================================================
 
-  const cambiarAdministrador = async (
-    usuarioId
-  ) => {
-
-    const token =
-      localStorage.getItem('access_token')
-
-    if (!token) {
-      setError(
-        'Tu sesión ha expirado'
-      )
-      return
-    }
-
+  const cambiarAdministrador = async (usuarioId) => {
     if (usuarioId === miUsuarioId) {
-      setError(
-        'No puedes cambiar tus propios permisos de administrador'
-      )
+      fallar('No puedes cambiar tus propios permisos de administrador.')
       return
     }
 
     try {
+      setUsuarioProcesandoId(usuarioId)
 
-      setUsuarioProcesandoId(
-        usuarioId
-      )
+      const { respuesta, datos } = await peticion(`/admin/usuarios/${usuarioId}/admin`, { metodo: 'PUT' })
+      if (!respuesta.ok) throw new Error(formatearMensajeError(datos?.detail, 'No se pudieron cambiar los permisos.'))
 
-      setError('')
-      setMensaje('')
-
-      const respuesta =
-        await fetch(
-          `${API_URL}/admin/usuarios/${usuarioId}/admin`,
-          {
-            method: 'PUT',
-            headers: {
-              Authorization: `Bearer ${token}`
-            }
-          }
-        )
-
-      const datos =
-        await respuesta.json()
-
-      if (!respuesta.ok) {
-        throw new Error(
-          datos?.detail ||
-          'No se pudieron cambiar los permisos'
-        )
-      }
-
-      setUsuarios(
-        (usuariosActuales) =>
-          usuariosActuales.map(
-            (usuario) =>
-              usuario.id === usuarioId
-                ? datos
-                : usuario
-          )
-      )
-
-      setMensaje(
+      setUsuarios((actuales) => actuales.map((u) => (u.id === usuarioId ? datos : u)))
+      avisar(
         datos.es_admin
-          ? 'Usuario convertido en administrador'
-          : 'Permisos de administrador retirados'
+          ? `${datos.nombre} ahora es administrador. El cambio se aplica cuando vuelva a iniciar sesión.`
+          : `${datos.nombre} ya no es administrador. El cambio se aplica cuando vuelva a iniciar sesión.`
       )
-
     } catch (err) {
-
       console.error(err)
-
-      setError(
-        err.message ||
-        'No se pudieron cambiar los permisos'
-      )
-
+      fallar(err.message)
     } finally {
-      setUsuarioProcesandoId(
-        null
-      )
+      setUsuarioProcesandoId(null)
     }
   }
 
   // =========================================================
-  // ELIMINAR USUARIO
+  // ELIMINAR USUARIO (tras confirmar en el modal)
   // =========================================================
 
-  const eliminarUsuario = async (
-    usuarioId
-  ) => {
-
-    const token =
-      localStorage.getItem('access_token')
-
-    if (!token) {
-      setError(
-        'Tu sesión ha expirado'
-      )
-      return
-    }
-
+  const eliminarUsuario = async (usuarioId) => {
     if (usuarioId === miUsuarioId) {
-      setError(
-        'No puedes eliminar tu propia cuenta'
-      )
-      return
-    }
-
-    const usuario =
-      usuarios.find(
-        (item) =>
-          item.id === usuarioId
-      )
-
-    const confirmar =
-      window.confirm(
-        `¿Seguro que quieres eliminar al usuario "${usuario?.nombre || 'este usuario'}"?\n\nTambién se eliminarán sus puntos y entregas relacionadas.`
-      )
-
-    if (!confirmar) {
-      return
+      fallar('No puedes eliminar tu propia cuenta.')
+      return false
     }
 
     try {
+      setUsuarioProcesandoId(usuarioId)
 
-      setUsuarioProcesandoId(
-        usuarioId
+      const { respuesta, datos } = await peticion(`/admin/usuarios/${usuarioId}`, { metodo: 'DELETE' })
+      if (!respuesta.ok) throw new Error(formatearMensajeError(datos?.detail, 'No se pudo eliminar el usuario.'))
+
+      setUsuarios((actuales) => actuales.filter((u) => u.id !== usuarioId))
+      setPuntosPendientes((actuales) => actuales.filter((p) => p.usuario_id !== usuarioId))
+      setTodosLosPuntos((actuales) => actuales.filter((p) => p.usuario_id !== usuarioId))
+      setEntregas((actuales) => actuales.filter((e) => e.usuario_id !== usuarioId))
+      setReportes((actuales) =>
+        actuales.filter((r) => (r.usuario_id ?? r.reportante_id ?? r.usuario?.id ?? r.reportante?.id) !== usuarioId)
       )
 
-      setError('')
-      setMensaje('')
-
-      const respuesta =
-        await fetch(
-          `${API_URL}/admin/usuarios/${usuarioId}`,
-          {
-            method: 'DELETE',
-            headers: {
-              Authorization: `Bearer ${token}`
-            }
-          }
-        )
-
-      let datos = null
-
-      try {
-        datos = await respuesta.json()
-      } catch {
-        datos = null
-      }
-
-      if (!respuesta.ok) {
-        throw new Error(
-          datos?.detail ||
-          'No se pudo eliminar el usuario'
-        )
-      }
-
-      setUsuarios(
-        (usuariosActuales) =>
-          usuariosActuales.filter(
-            (usuario) =>
-              usuario.id !== usuarioId
-          )
-      )
-
-      setPuntosPendientes(
-        (puntosActuales) =>
-          puntosActuales.filter(
-            (punto) =>
-              punto.usuario_id !== usuarioId
-          )
-      )
-
-      setPuntosAprobados(
-        (puntosActuales) =>
-          puntosActuales.filter(
-            (punto) =>
-              punto.usuario_id !== usuarioId
-          )
-      )
-
-      // Quitar también los puntos del usuario
-      // de la pestaña "Todos los puntos".
-      setTodosLosPuntos(
-        (puntosActuales) =>
-          puntosActuales.filter(
-            (punto) =>
-              punto.usuario_id !== usuarioId
-          )
-      )
-
-      // Evita dejar reportes huérfanos visualmente
-      // después de que el backend confirme la eliminación.
-      setReportes(
-        (reportesActuales) =>
-          reportesActuales.filter(
-            (reporte) =>
-              (
-                reporte.usuario_id ??
-                reporte.reportante_id ??
-                reporte.usuario?.id ??
-                reporte.reportante?.id
-              ) !== usuarioId
-          )
-      )
-
-      setMensaje(
-        'Usuario eliminado correctamente'
-      )
-
+      avisar('Eliminaste la cuenta.')
+      return true
     } catch (err) {
-
       console.error(err)
-
-      setError(
-        err.message ||
-        'No se pudo eliminar el usuario'
-      )
-
+      fallar(err.message)
+      return false
     } finally {
-      setUsuarioProcesandoId(
-        null
-      )
+      setUsuarioProcesandoId(null)
     }
   }
 
-  // =========================================================
-  // ESTADÍSTICAS
-  // =========================================================
-
-  const totalUsuariosVal =
-    useCountUp(
-      usuarios.length
-    )
-
-  const totalPendientesVal =
-    useCountUp(
-      puntosPendientes.length
-    )
-
-  const totalAprobadosVal =
-    useCountUp(
-      puntosAprobados.length
-    )
-
-  const totalPuntosSum =
-    puntosPendientes.length +
-    puntosAprobados.length
-
-  const totalPuntosVal =
-    useCountUp(
-      totalPuntosSum
-    )
-
-  const porcentajeAprobados =
-    totalPuntosSum > 0
-      ? Math.round(
-          (
-            puntosAprobados.length /
-            totalPuntosSum
-          ) *
-          100
-        )
-      : 0
-
-  const porcentajePendientes =
-    totalPuntosSum > 0
-      ? Math.round(
-          (
-            puntosPendientes.length /
-            totalPuntosSum
-          ) *
-          100
-        )
-      : 0
-
-  // =========================================================
-  // ANIMACIONES
-  // =========================================================
-
-  const contenedorVariantes = {
-    oculto: {},
-
-    visible: {
-      transition: {
-        staggerChildren:
-          prefiereReducido
-            ? 0
-            : 0.08
-      }
-    }
+  const confirmarEliminacion = async () => {
+    if (!confirmacion) return
+    const { tipo, elemento } = confirmacion
+    const hecho = tipo === 'punto' ? await eliminarPunto(elemento.id) : await eliminarUsuario(elemento.id)
+    if (hecho) setConfirmacion(null)
   }
 
-  const elementoVariantes = {
-    oculto: {
-      opacity: 0,
-      y: prefiereReducido
-        ? 0
-        : 15
-    },
+  // =========================================================
+  // NAVEGACIÓN
+  // =========================================================
 
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        type: 'spring',
-        stiffness: 100,
-        damping: 15
-      }
-    },
-
-    salida: {
-      opacity: 0,
-      x: prefiereReducido
-        ? 0
-        : -30,
-
-      transition: {
-        duration: 0.25
-      }
+  const irA = (destino, filtro) => {
+    setSeccion(destino)
+    if (filtro) {
+      if (destino === 'puntos') setFiltroPuntos(filtro)
+      if (destino === 'entregas') setFiltroEntregas(filtro)
+      if (destino === 'reportes') setFiltroReportes(filtro)
     }
+    window.scrollTo({ top: 0, behavior: reducido ? 'auto' : 'smooth' })
+  }
+
+  const entregasPendientes = entregas.filter((e) => e.estado === 'pendiente').length
+  const reportesPendientes = reportes.filter((r) => (r.estado || 'pendiente') === 'pendiente').length
+  const prioritarios = todosLosPuntos.filter((p) => p.revision_prioritaria).length
+
+  const contadores = {
+    pendientes: { valor: puntosPendientes.length, tono: 'amber', descripcion: 'por aprobar' },
+    entregas: { valor: entregasPendientes, tono: 'amber', descripcion: 'por verificar' },
+    reportes: { valor: reportesPendientes, tono: 'red', descripcion: 'abiertos' },
+    puntos: { valor: prioritarios, tono: 'amber', descripcion: 'en revisión prioritaria' },
+    usuarios: { valor: usuarios.length, tono: 'gris', descripcion: 'en total' }
   }
 
   // =========================================================
@@ -1731,30 +577,19 @@ function Admin() {
 
   if (!cargando && !esAdmin) {
     return (
-      <div className="min-h-screen bg-[#f1f8f4] dark:bg-[#0f1512] text-[#333333] dark:text-[#f2f5f3] flex flex-col items-center justify-center p-6 text-center font-sans">
-
-        <span className="text-5xl mb-4">
-          🛡️
-        </span>
-
-        <h1 className="text-2xl font-black text-gray-800 dark:text-white mb-2">
-          Acceso Restringido
-        </h1>
-
-        <p className="text-xs text-gray-500 dark:text-[#a8b3ae] max-w-sm mb-6">
-          {error ||
-            'Solo los administradores autorizados pueden acceder a este panel.'}
-        </p>
-
-        <button
-          onClick={() =>
-            navigate('/login')
-          }
-          className="px-6 py-2.5 bg-[#218739] hover:bg-[#176b2b] text-white text-xs font-bold rounded-xl cursor-pointer transition-colors"
-        >
-          Iniciar sesión
-        </button>
-
+      <div className="min-h-[calc(100vh-4rem)] bg-[#f1f8f4] dark:bg-[#0f1512] flex items-center justify-center p-4">
+        <div className="w-full max-w-md text-center bg-white dark:bg-[#1a2320] border border-gray-100 dark:border-gray-800/60 rounded-3xl shadow-xl p-8 sm:p-10">
+          <span className="mx-auto w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 flex items-center justify-center text-3xl" aria-hidden="true">
+            🔒
+          </span>
+          <p className="mt-6 text-xs font-extrabold uppercase tracking-[0.18em] text-[#218739] dark:text-[#2fa350]">Panel de administración</p>
+          <h1 className="mt-2 text-2xl font-black tracking-tight text-gray-900 dark:text-white">Acceso restringido</h1>
+          <p className="mt-2 text-sm text-gray-500 dark:text-[#a8b3ae]">{error || 'Solo los administradores pueden entrar a este panel.'}</p>
+          <div className="mt-7 flex flex-col sm:flex-row gap-2 justify-center">
+            <BotonAccion onClick={() => navigate('/home')}>Volver al inicio</BotonAccion>
+            <BotonAccion variante="primario" onClick={() => navigate('/login')}>Iniciar sesión</BotonAccion>
+          </div>
+        </div>
       </div>
     )
   }
@@ -1763,2003 +598,140 @@ function Admin() {
   // PANEL
   // =========================================================
 
+  const encabezado = ENCABEZADOS[seccion]
+
   return (
-    <div className="min-h-screen bg-[#f1f8f4] dark:bg-[#0f1512] text-[#333333] dark:text-[#f2f5f3] font-sans transition-colors duration-300">
-
-      {/* HEADER */}
-
-      <header className="sticky top-16 z-50 bg-white/80 dark:bg-[#1a2320]/80 backdrop-blur-md border-b border-gray-100 dark:border-gray-800/40 py-5 px-4 sm:px-6 lg:px-8 shadow-2xs">
-
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-
-          <div>
-
-            <div className="flex items-center gap-2">
-
-            </div>
-
-            <p className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-1 font-medium">
-              Panel de Administración y Moderación Comunitaria
-            </p>
-
-          </div>
-
-          <div className="flex items-center gap-3 flex-wrap">
-
-            {/* TABS */}
-
-            <div className="bg-gray-100 dark:bg-[#121816] p-1 rounded-xl flex items-center gap-1 flex-wrap">
-
-              {/* PENDIENTES */}
-
-              <button
-                type="button"
-                onClick={() =>
-                  setPestañaActiva(
-                    'pendientes'
-                  )
-                }
-                className={`px-3.5 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center gap-1.5 ${
-                  pestañaActiva ===
-                  'pendientes'
-                    ? 'bg-white dark:bg-[#1a2320] text-[#218739] dark:text-[#2fa350] shadow-2xs'
-                    : 'text-gray-500 dark:text-[#a8b3ae]'
-                }`}
-              >
-                ⏳ Pendientes
-
-                {puntosPendientes.length >
-                  0 && (
-                  <span className="bg-[#218739] text-white text-[10px] px-1.5 py-0.2 rounded-full font-black">
-                    {puntosPendientes.length}
-                  </span>
-                )}
-              </button>
-
-              {/* =================================================
-                  PUNTOS
-              ================================================== */}
-
-              <button
-                type="button"
-                onClick={() =>
-                  setPestañaActiva(
-                    'puntos'
-                  )
-                }
-                className={`px-3.5 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center gap-1.5 ${
-                  pestañaActiva ===
-                  'puntos'
-                    ? 'bg-white dark:bg-[#1a2320] text-[#218739] dark:text-[#2fa350] shadow-2xs'
-                    : 'text-gray-500 dark:text-[#a8b3ae]'
-                }`}
-              >
-                📍 Puntos
-
-                {todosLosPuntos.length >
-                  0 && (
-                  <span className="bg-[#218739] text-white text-[10px] px-1.5 py-0.2 rounded-full font-black">
-                    {todosLosPuntos.length}
-                  </span>
-                )}
-
-                {todosLosPuntos.some((p) => p.revision_prioritaria) && (
-                  <span
-                    className="bg-amber-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-black"
-                    title="Puntos marcados para revisión prioritaria por reseñas negativas"
-                  >
-                    ⚠️ {todosLosPuntos.filter((p) => p.revision_prioritaria).length}
-                  </span>
-                )}
-              </button>
-    
-              {/* ENTREGAS */}
-
-              <button
-                type="button"
-                onClick={() =>
-                  setPestañaActiva(
-                    'entregas'
-                  )
-                }
-                className={`px-3.5 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center gap-1.5 ${
-                  pestañaActiva ===
-                  'entregas'
-                    ? 'bg-white dark:bg-[#1a2320] text-[#218739] dark:text-[#2fa350] shadow-2xs'
-                    : 'text-gray-500 dark:text-[#a8b3ae]'
-                }`}
-              >
-                ♻️ Entregas
-
-                {entregas.length >
-                  0 && (
-                  <span className="bg-[#218739] text-white text-[10px] px-1.5 py-0.2 rounded-full font-black">
-                    {entregas.length}
-                  </span>
-                )}
-              </button>
-
-              
-
-              {/* USUARIOS */}
-
-              <button
-                type="button"
-                onClick={() =>
-                  setPestañaActiva(
-                    'usuarios'
-                  )
-                }
-                className={`px-3.5 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center gap-1.5 ${
-                  pestañaActiva ===
-                  'usuarios'
-                    ? 'bg-white dark:bg-[#1a2320] text-[#218739] dark:text-[#2fa350] shadow-2xs'
-                    : 'text-gray-500 dark:text-[#a8b3ae]'
-                }`}
-              >
-                👥 Usuarios
-
-                {usuarios.length >
-                  0 && (
-                  <span className="bg-blue-600 text-white text-[10px] px-1.5 py-0.2 rounded-full font-black">
-                    {usuarios.length}
-                  </span>
-                )}
-              </button>
-
-              {/* REPORTES */}
-
-              <button
-                type="button"
-                onClick={() =>
-                  setPestañaActiva(
-                    'reportes'
-                  )
-                }
-                className={`px-3.5 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center gap-1.5 ${
-                  pestañaActiva ===
-                  'reportes'
-                    ? 'bg-white dark:bg-[#1a2320] text-[#218739] dark:text-[#2fa350] shadow-2xs'
-                    : 'text-gray-500 dark:text-[#a8b3ae]'
-                }`}
-              >
-                🚩 Reportes
-
-                {reportes.filter(
-                  (reporte) =>
-                    (
-                      reporte.estado ||
-                      'pendiente'
-                    ) === 'pendiente'
-                ).length > 0 && (
-                  <span className="bg-red-600 text-white text-[10px] px-1.5 py-0.2 rounded-full font-black">
-                    {
-                      reportes.filter(
-                        (reporte) =>
-                          (
-                            reporte.estado ||
-                            'pendiente'
-                          ) === 'pendiente'
-                      ).length
-                    }
-                  </span>
-                )}
-              </button>
-
-              {/* RESUMEN */}
-
-              <button
-                type="button"
-                onClick={() =>
-                  setPestañaActiva(
-                    'resumen'
-                  )
-                }
-                className={`px-3.5 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all ${
-                  pestañaActiva ===
-                  'resumen'
-                    ? 'bg-white dark:bg-[#1a2320] text-[#218739] dark:text-[#2fa350] shadow-2xs'
-                    : 'text-gray-500 dark:text-[#a8b3ae]'
-                }`}
-              >
-                📊 Resumen
-              </button>
-
-            </div>
-
-            {/* ACTUALIZAR */}
-
-            <button
-              type="button"
-              onClick={() =>
-                cargarDatosDashboard()
-              }
-              disabled={cargando}
-              className="px-3.5 py-1.5 text-xs font-bold text-white bg-[#218739] hover:bg-[#176b2b] rounded-xl cursor-pointer disabled:opacity-50 transition-all"
-            >
-              {cargando
-                ? '⏳ Cargando...'
-                : '🔄 Actualizar'}
-            </button>
-
-          </div>
-
-        </div>
-
-      </header>
-
-      {/* CONTENIDO */}
-
-      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8">
-
-        {/* MENSAJES */}
-
-        <AnimatePresence>
-
-          {error && (
-            <motion.div
-              initial={{
-                opacity: 0,
-                y: -10
-              }}
-              animate={{
-                opacity: 1,
-                y: 0
-              }}
-              exit={{
-                opacity: 0,
-                y: -10
-              }}
-              className="p-4 bg-red-50 dark:bg-red-950/20 border-l-4 border-[#d93025] text-xs font-bold text-[#d93025] dark:text-[#ef5350] rounded-r-xl"
-            >
-              ⚠️ {error}
-            </motion.div>
-          )}
-
-          {mensaje && (
-            <motion.div
-              initial={{
-                opacity: 0,
-                y: -10
-              }}
-              animate={{
-                opacity: 1,
-                y: 0
-              }}
-              exit={{
-                opacity: 0,
-                y: -10
-              }}
-              className="p-4 bg-green-50 dark:bg-green-950/20 border-l-4 border-[#218739] text-xs font-bold text-[#218739] dark:text-[#2fa350] rounded-r-xl"
-            >
-              🎉 {mensaje}
-            </motion.div>
-          )}
-
-        </AnimatePresence>
-
-        {/* ESTADÍSTICAS */}
-
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-
-          <div className="bg-white dark:bg-[#1a2320] p-6 rounded-2xl border border-gray-100 dark:border-gray-800/40 shadow-2xs">
-
-            <div className="flex justify-between items-center text-xs font-bold text-gray-400 uppercase">
-              <span>Usuarios</span>
-
-              <span className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/20 text-blue-600 text-sm">
-                👥
-              </span>
-            </div>
-
-            <div className="mt-3 text-3xl font-black text-gray-900 dark:text-white">
-              {cargando
-                ? '...'
-                : totalUsuariosVal}
-            </div>
-
-            <p className="text-[11px] text-gray-400 mt-1 font-semibold">
-              Ciudadanos registrados
-            </p>
-
-          </div>
-
-          <div className="bg-white dark:bg-[#1a2320] p-6 rounded-2xl border border-gray-100 dark:border-gray-800/40 shadow-2xs">
-
-            <div className="flex justify-between items-center text-xs font-bold text-gray-400 uppercase">
-              <span>Pendientes</span>
-
-              <span className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/20 text-amber-600 text-sm">
-                ⏳
-              </span>
-            </div>
-
-            <div className="mt-3 text-3xl font-black text-amber-500">
-              {cargando
-                ? '...'
-                : totalPendientesVal}
-            </div>
-
-            <p className="text-[11px] text-amber-600/80 font-bold mt-1">
-              Requieren revisión
-            </p>
-
-          </div>
-
-          <div className="bg-white dark:bg-[#1a2320] p-6 rounded-2xl border border-gray-100 dark:border-gray-800/40 shadow-2xs">
-
-            <div className="flex justify-between items-center text-xs font-bold text-gray-400 uppercase">
-              <span>Aprobados</span>
-
-              <span className="p-2 rounded-xl bg-green-50 dark:bg-green-950/20 text-[#218739] text-sm">
-                ✓
-              </span>
-            </div>
-
-            <div className="mt-3 text-3xl font-black text-[#218739]">
-              {cargando
-                ? '...'
-                : totalAprobadosVal}
-            </div>
-
-            <p className="text-[11px] text-green-600/80 font-bold mt-1">
-              Visibles en el mapa
-            </p>
-
-          </div>
-
-          <div className="bg-white dark:bg-[#1a2320] p-6 rounded-2xl border border-gray-100 dark:border-gray-800/40 shadow-2xs">
-
-            <div className="flex justify-between items-center text-xs font-bold text-gray-400 uppercase">
-              <span>Total Puntos</span>
-
-              <span className="p-2 rounded-xl bg-emerald-50 text-emerald-600 text-sm">
-                🌱
-              </span>
-            </div>
-
-            <div className="mt-3 text-3xl font-black text-gray-900 dark:text-white">
-              {cargando
-                ? '...'
-                : totalPuntosVal}
-            </div>
-
-            <p className="text-[11px] text-gray-400 mt-1 font-semibold">
-              Pendientes + aprobados
-            </p>
-
-          </div>
-
-        </section>
-
-       {/* =====================================================
-    PESTAÑA PUNTOS
-===================================================== */}
-
-{pestañaActiva === 'puntos' ? (
-
-  <section className="bg-white dark:bg-[#1a2320] rounded-3xl border border-gray-100 dark:border-gray-800/40 shadow-xs overflow-hidden">
-
-    <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-800/40 bg-gray-50/30 dark:bg-[#121816]/30">
-
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-
-        <div>
-
-          <h3 className="text-base font-extrabold text-gray-800 dark:text-[#f2f5f3]">
-            Todos los puntos ecológicos
-          </h3>
-
-          <p className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-1">
-            Consulta y administra todos los puntos registrados en Eco-TRACE.
-          </p>
-
-        </div>
-
-        <Badge
-          tipo="info"
-          texto={`${todosLosPuntos.length} puntos`}
-        />
-
-      </div>
-
-    </div>
-
-    {cargando ? (
-
-      <div className="p-8 text-center text-sm text-gray-400">
-        ⏳ Cargando puntos...
-      </div>
-
-    ) : todosLosPuntos.length === 0 ? (
-
-      <EmptyState
-        titulo="No hay puntos registrados"
-        descripcion="Actualmente no existen puntos ecológicos registrados en el sistema."
-        icono="📍"
-      />
-
-    ) : (
-
-      <div className="overflow-x-auto">
-
-        <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800/40">
-
-          <thead>
-
-            <tr className="bg-gray-50/30 dark:bg-[#121816]/30 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">
-
-              <th className="px-6 py-4">
-                Punto
-              </th>
-
-              <th className="px-6 py-4">
-                Ubicación
-              </th>
-
-              <th className="px-6 py-4">
-                Categorías
-              </th>
-
-              <th className="px-6 py-4">
-                Estado
-              </th>
-
-              <th className="px-6 py-4">
-                Creador
-              </th>
-
-              <th className="px-6 py-4 text-right">
-                Acciones
-              </th>
-
-            </tr>
-
-          </thead>
-
-          <motion.tbody
-            variants={contenedorVariantes}
-            initial="oculto"
-            animate="visible"
-            className="divide-y divide-gray-100 dark:divide-gray-800/40"
-          >
-
-            <AnimatePresence>
-
-              {[...todosLosPuntos]
-                // Primero los marcados para revisión prioritaria
-                .sort((a, b) => Number(Boolean(b.revision_prioritaria)) - Number(Boolean(a.revision_prioritaria)))
-                .map(
-                (punto) => {
-
-                  const creador =
-                    obtenerCreador(
-                      punto.usuario_id
-                    )
-
-                  const eliminando =
-                    puntoEliminandoId ===
-                    punto.id
-
-                  return (
-
-                    <motion.tr
-                      key={punto.id}
-                      variants={elementoVariantes}
-                      initial="oculto"
-                      animate="visible"
-                      exit="salida"
-                      className="hover:bg-gray-50/30 dark:hover:bg-gray-800/20"
-                    >
-
-                      {/* PUNTO */}
-
-                      <td className="px-6 py-4">
-
-                        <div className="flex items-start gap-3">
-
-                          <div className="w-9 h-9 rounded-xl bg-[#f1f8f4] dark:bg-[#0f1512] flex items-center justify-center text-[#218739] dark:text-[#2fa350] font-black shrink-0">
-                            📍
-                          </div>
-
-                          <div className="min-w-0">
-
-                            <div className="text-sm font-extrabold text-gray-800 dark:text-[#f2f5f3]">
-                              {punto.nombre}
-                            </div>
-
-                            <div className="text-[10px] text-gray-400 font-mono mt-1">
-                              ID: {punto.id}
-                            </div>
-
-                            <div className="text-[11px] text-gray-500 dark:text-[#a8b3ae] mt-1">
-                              {punto.total_resenas > 0 ? (
-                                <>
-                                  <span className="text-amber-500">★</span>{' '}
-                                  <strong>
-                                    {Number(punto.calificacion_promedio).toLocaleString('es-CO', { maximumFractionDigits: 1 })}
-                                  </strong>
-                                  {' · '}
-                                  {punto.total_resenas} {punto.total_resenas === 1 ? 'reseña' : 'reseñas'}
-                                </>
-                              ) : (
-                                'Sin reseñas'
-                              )}
-                            </div>
-
-                            <p
-                              className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-2 max-w-xs"
-                              title={punto.descripcion}
-                            >
-                              {punto.descripcion}
-                            </p>
-
-                          </div>
-
-                        </div>
-
-                      </td>
-
-                      {/* UBICACIÓN */}
-
-                      <td className="px-6 py-4">
-
-                        <div className="text-xs text-gray-800 dark:text-[#f2f5f3] font-bold">
-                          {punto.direccion}
-                        </div>
-
-                        <div className="text-[11px] text-gray-400 mt-0.5">
-                          {punto.localidad}
-                        </div>
-
-                        <div className="text-[10px] text-gray-400 font-mono mt-1">
-                          {Number(
-                            punto.latitud
-                          ).toFixed(5)}
-                          {', '}
-                          {Number(
-                            punto.longitud
-                          ).toFixed(5)}
-                        </div>
-
-                      </td>
-
-                      {/* CATEGORÍAS */}
-
-                      <td className="px-6 py-4">
-
-                        <div className="flex flex-wrap gap-1.5 max-w-xs">
-
-                          {punto.categorias?.map(
-                            (
-                              categoria,
-                              index
-                            ) => (
-                              <span
-                                key={`${punto.id}-${index}`}
-                                className="text-[10px] font-bold px-2 py-1 rounded-full bg-gray-100 dark:bg-[#121816] text-gray-600 dark:text-[#b9c5c0]"
-                              >
-                                {categoria}
-                              </span>
-                            )
-                          )}
-
-                        </div>
-
-                      </td>
-
-                      {/* ESTADO */}
-
-                      <td className="px-6 py-4 whitespace-nowrap">
-
-                        <Badge
-                          tipo={
-                            punto.estado ===
-                            'aprobado'
-                              ? 'aprobado'
-                              : punto.estado ===
-                                'rechazado'
-                                ? 'rechazado'
-                                : 'pendiente'
-                          }
-                          texto={
-                            punto.estado
-                          }
-                        />
-
-                        {punto.motivo_rechazo && (
-                          <p className="text-[10px] text-red-500 mt-2 max-w-xs">
-                            Motivo: {punto.motivo_rechazo}
-                          </p>
-                        )}
-
-                        {punto.revision_prioritaria && (
-                          <div className="mt-2 max-w-[14rem] whitespace-normal rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 px-2.5 py-1.5">
-                            <p className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800 dark:text-amber-400">
-                              ⚠️ Revisión prioritaria
-                            </p>
-                            {punto.motivo_revision && (
-                              <p className="text-[10px] text-amber-700 dark:text-amber-300 mt-0.5">
-                                {punto.motivo_revision}
-                              </p>
-                            )}
-                          </div>
-                        )}
-
-                      </td>
-
-                      {/* CREADOR */}
-
-                      <td className="px-6 py-4 whitespace-nowrap">
-
-                        {creador ? (
-
-                          <div>
-
-                            <div className="text-xs font-bold text-gray-800 dark:text-[#f2f5f3]">
-                              {creador.nombre}
-                            </div>
-
-                            <div className="text-[11px] text-gray-400 mt-0.5">
-                              {creador.correo}
-                            </div>
-
-                            <div className="text-[10px] text-gray-400 mt-0.5">
-                              ID: {creador.id}
-                            </div>
-
-                          </div>
-
-                        ) : (
-
-                          <span className="text-xs text-gray-500">
-                            Usuario #{punto.usuario_id}
-                          </span>
-
-                        )}
-
-                      </td>
-
-                      {/* ACCIONES */}
-
-                      <td className="px-6 py-4 whitespace-nowrap">
-
-                        <div className="flex items-center justify-end gap-2">
-
-                          {punto.revision_prioritaria && (
-                            <LoadingButton
-                              cargando={puntoRevisandoId === punto.id}
-                              texto="✓ Marcar revisado"
-                              textoCargando="Guardando..."
-                              variante="secundario"
-                              onClick={() => marcarPuntoRevisado(punto.id)}
-                            />
-                          )}
-
-                          <LoadingButton
-                            cargando={
-                              eliminando
-                            }
-                            texto="🗑️ Eliminar"
-                            textoCargando="Eliminando..."
-                            variante="peligro"
-                            onClick={() =>
-                              eliminarPunto(
-                                punto.id
-                              )
-                            }
-                            deshabilitado={
-                              puntoEliminandoId !==
-                                null &&
-                              !eliminando
-                            }
-                          />
-
-                        </div>
-
-                      </td>
-
-                    </motion.tr>
-
-                  )
-                }
-              )}
-
-            </AnimatePresence>
-
-          </motion.tbody>
-
-        </table>
-
-      </div>
-
-    )}
-
-  </section>
-
-) : pestañaActiva === 'entregas' ? (
-
-  /* =====================================================
-     PESTAÑA ENTREGAS
-  ===================================================== */
-
-  <section className="bg-white dark:bg-[#1a2320] rounded-3xl border border-gray-100 dark:border-gray-800/40 shadow-xs overflow-hidden">
-
-    <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-800/40 bg-gray-50/30 dark:bg-[#121816]/30">
-
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-
-        <div>
-
-          <h3 className="text-base font-extrabold text-gray-800 dark:text-[#f2f5f3]">
-            Entregas registradas
-          </h3>
-
-          <p className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-1">
-            Verifica o rechaza las entregas que registran los usuarios en los puntos ecológicos.
-          </p>
-
-        </div>
-
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar entregas por estado">
-          {[
-            { id: 'todas', nombre: 'Todas' },
-            { id: 'pendiente', nombre: 'Pendientes' },
-            { id: 'verificada', nombre: 'Verificadas' },
-            { id: 'rechazada', nombre: 'Rechazadas' }
-          ].map((f) => {
-            const activo = filtroEntregas === f.id
-            const total = f.id === 'todas'
-              ? entregas.length
-              : entregas.filter((e) => e.estado === f.id).length
-
-            return (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setFiltroEntregas(f.id)}
-                aria-pressed={activo}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors cursor-pointer ${
-                  activo
-                    ? 'bg-[#218739] dark:bg-[#2fa350] text-white border-transparent'
-                    : 'bg-white dark:bg-[#121816] text-gray-600 dark:text-[#a8b3ae] border-gray-200 dark:border-gray-800/60 hover:border-[#218739]/40'
-                }`}
-              >
-                {f.nombre} <span className="opacity-70">({total})</span>
-              </button>
-            )
-          })}
-        </div>
-
-      </div>
-
-    </div>
-
-    {cargando ? (
-
-      <div className="p-8 text-center text-sm text-gray-400">
-        ⏳ Cargando entregas...
-      </div>
-
-    ) : entregas.length === 0 ? (
-
-      <EmptyState
-        titulo="No hay entregas registradas"
-        descripcion="Actualmente no existen entregas registradas en el sistema."
-        icono="♻️"
-      />
-
-    ) : (
-
-      <div className="overflow-x-auto">
-
-        <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800/40">
-
-          <thead>
-
-            <tr className="bg-gray-50/30 dark:bg-[#121816]/30 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">
-
-              <th className="px-6 py-4">
-                Usuario
-              </th>
-
-              <th className="px-6 py-4">
-                Punto ecológico
-              </th>
-
-              <th className="px-6 py-4">
-                Tipo
-              </th>
-
-              <th className="px-6 py-4">
-                Cantidad
-              </th>
-
-              <th className="px-6 py-4">
-                Fecha
-              </th>
-
-              <th className="px-6 py-4">
-                Estado
-              </th>
-
-              <th className="px-6 py-4">
-                Observación
-              </th>
-
-              <th className="px-6 py-4 text-right">
-                Acciones
-              </th>
-
-            </tr>
-
-          </thead>
-
-          <motion.tbody
-            variants={contenedorVariantes}
-            initial="oculto"
-            animate="visible"
-            className="divide-y divide-gray-100 dark:divide-gray-800/40"
-          >
-
-            <AnimatePresence>
-
-              {entregas
-                .filter((entrega) =>
-                  filtroEntregas === 'todas' || entrega.estado === filtroEntregas
-                )
-                .map(
-                (entrega) => (
-
-                  <motion.tr
-                    key={entrega.id}
-                    variants={elementoVariantes}
-                    initial="oculto"
-                    animate="visible"
-                    exit="salida"
-                    className="hover:bg-gray-50/30 dark:hover:bg-gray-800/20"
-                  >
-
-                    {/* USUARIO */}
-
-                    <td className="px-6 py-4">
-
-                      <div className="flex items-center gap-3">
-
-                        <div className="w-9 h-9 rounded-full bg-[#f1f8f4] dark:bg-[#0f1512] flex items-center justify-center text-[#218739] dark:text-[#2fa350] font-black shrink-0">
-                          {entrega.usuario_nombre
-                            ?.charAt(0)
-                            ?.toUpperCase()}
-                        </div>
-
-                        <div className="min-w-0">
-
-                          <div className="text-xs font-extrabold text-gray-800 dark:text-[#f2f5f3]">
-                            {entrega.usuario_nombre}
-                          </div>
-
-                          <div className="text-[11px] text-gray-400 mt-0.5">
-                            {entrega.usuario_correo}
-                          </div>
-
-                          <div className="text-[10px] text-gray-400 font-mono mt-0.5">
-                            ID: {entrega.usuario_id}
-                          </div>
-
-                        </div>
-
-                      </div>
-
-                    </td>
-
-                    {/* PUNTO */}
-
-                    <td className="px-6 py-4">
-
-                      <div className="text-xs font-bold text-gray-800 dark:text-[#f2f5f3]">
-                        📍 {entrega.punto_nombre}
-                      </div>
-
-                      <div className="text-[11px] text-gray-400 mt-1">
-                        {entrega.punto_direccion}
-                      </div>
-
-                      <div className="text-[10px] text-gray-400 font-mono mt-1">
-                        ID: {entrega.punto_id}
-                      </div>
-
-                    </td>
-
-                    {/* TIPO */}
-
-                    <td className="px-6 py-4">
-
-                      <div className="whitespace-nowrap">
-                        {entrega.tipo === 'ropa' ? (
-
-                          <span className="text-xs font-bold">
-                            👕 Ropa
-                          </span>
-
-                        ) : entrega.tipo === 'electronicos' ? (
-
-                          <span className="text-xs font-bold">
-                            🔌 Electrónicos
-                          </span>
-
-                        ) : (
-
-                          <span className="text-xs font-bold">
-                            ♻️ Reciclaje
-                          </span>
-
-                        )}
-                      </div>
-
-                      {entrega.nombre_articulo && (
-                        <div className="text-[11px] text-gray-600 dark:text-[#a8b3ae] mt-1 max-w-[12rem]">
-                          {entrega.nombre_articulo}
-                        </div>
-                      )}
-
-                      {entrega.estado_conservacion && (
-                        <div className="text-[10px] text-gray-400 mt-0.5">
-                          Estado: {ESTADOS_CONSERVACION.find((e) => e.id === entrega.estado_conservacion)?.nombre ?? entrega.estado_conservacion}
-                        </div>
-                      )}
-
-                      {entrega.foto_url && (
-                        <a
-                          href={entrega.foto_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-block text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline mt-1"
-                        >
-                          📷 Ver foto
-                        </a>
-                      )}
-
-                    </td>
-
-                    {/* CANTIDAD */}
-
-                    <td className="px-6 py-4 whitespace-nowrap">
-
-                      <div className="text-sm font-black text-gray-800 dark:text-[#f2f5f3]">
-                        {entrega.cantidad}
-                      </div>
-
-                      <div className="text-[10px] text-gray-400 uppercase font-bold">
-                        {entrega.unidad}
-                      </div>
-
-                      {entrega.peso && entrega.unidad !== 'kg' && (
-                        <div className="text-[10px] text-gray-400 font-bold mt-0.5">
-                          ≈ {entrega.peso} kg
-                        </div>
-                      )}
-
-                    </td>
-
-                    {/* FECHA */}
-
-                    <td className="px-6 py-4 whitespace-nowrap">
-
-                      <div className="text-xs font-bold text-gray-700 dark:text-[#dce4e0]">
-                        {new Date(
-                          entrega.fecha
-                        ).toLocaleDateString(
-                          'es-CO'
-                        )}
-                      </div>
-
-                      <div className="text-[10px] text-gray-400 mt-1">
-                        {new Date(
-                          entrega.fecha
-                        ).toLocaleTimeString(
-                          'es-CO',
-                          {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          }
-                        )}
-                      </div>
-
-                    </td>
-
-                    {/* ESTADO */}
-
-                    <td className="px-6 py-4 whitespace-nowrap">
-
-                      <Badge
-                        tipo={
-                          entrega.estado === 'verificada'
-                            ? 'aprobado'
-                            : entrega.estado === 'rechazada'
-                            ? 'rechazado'
-                            : 'pendiente'
-                        }
-                        texto={
-                          ESTADOS_ENTREGA[entrega.estado]?.nombre ?? entrega.estado
-                        }
-                      />
-
-                      {entrega.estado === 'rechazada' && entrega.observacion_admin && (
-                        <p
-                          className="text-[10px] text-[#d93025] dark:text-[#ef5350] mt-1 max-w-[12rem] whitespace-normal"
-                          title={entrega.observacion_admin}
-                        >
-                          {entrega.observacion_admin}
-                        </p>
-                      )}
-
-                    </td>
-
-                    {/* OBSERVACIÓN */}
-
-                    <td className="px-6 py-4">
-
-                      {entrega.observacion ? (
-
-                        <p
-                          className="text-xs text-gray-600 dark:text-[#a8b3ae] max-w-xs"
-                          title={entrega.observacion}
-                        >
-                          {entrega.observacion}
-                        </p>
-
-                      ) : (
-
-                        <span className="text-xs text-gray-400 italic">
-                          Sin observación
-                        </span>
-
-                      )}
-
-                    </td>
-
-                    {/* ACCIONES */}
-
-                    <td className="px-6 py-4">
-
-                      <div className="flex justify-end gap-2">
-
-                        {entrega.estado !== 'verificada' && (
-                          <LoadingButton
-                            cargando={entregaProcesandoId === entrega.id}
-                            texto="✓ Verificar"
-                            textoCargando="Guardando..."
-                            onClick={() => revisarEntrega(entrega.id, 'verificada')}
-                          />
-                        )}
-
-                        {entrega.estado !== 'rechazada' && (
-                          <LoadingButton
-                            variante="peligro"
-                            texto="✕ Rechazar"
-                            deshabilitado={entregaProcesandoId === entrega.id}
-                            onClick={() => setEntregaARechazar(entrega)}
-                          />
-                        )}
-
-                      </div>
-
-                    </td>
-
-                  </motion.tr>
-
-                )
-              )}
-
-            </AnimatePresence>
-
-          </motion.tbody>
-
-        </table>
-
-      </div>
-
-    )}
-
-  </section>
-
-) : pestañaActiva === 'usuarios' ? (
-
-  /* =====================================================
-     PESTAÑA USUARIOS
-  ===================================================== */
-
-  <section className="bg-white dark:bg-[#1a2320] rounded-3xl border border-gray-100 dark:border-gray-800/40 shadow-xs overflow-hidden">
-
-    <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-800/40 bg-gray-50/30 dark:bg-[#121816]/30">
-
-      <div className="flex items-center justify-between gap-4">
-
-        <div>
-
-          <h3 className="text-base font-extrabold text-gray-800 dark:text-[#f2f5f3]">
-            Usuarios registrados
-          </h3>
-
-          <p className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-1">
-            Administra los usuarios registrados en Eco-TRACE.
-          </p>
-
-        </div>
-
-        <Badge
-          tipo="usuario"
-          texto={`${usuarios.length} usuarios`}
-        />
-
-      </div>
-
-    </div>
-
-    {cargando ? (
-
-      <div className="p-8 text-center text-sm text-gray-400">
-        ⏳ Cargando usuarios...
-      </div>
-
-    ) : usuarios.length === 0 ? (
-
-      <EmptyState
-        titulo="No hay usuarios"
-        descripcion="No existen usuarios registrados en el sistema."
-        icono="👥"
-      />
-
-    ) : (
-
-      <div className="overflow-x-auto">
-
-        <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800/40">
-
-          <thead>
-
-            <tr className="bg-gray-50/30 dark:bg-[#121816]/30 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">
-
-              <th className="px-6 py-4">
-                ID
-              </th>
-
-              <th className="px-6 py-4">
-                Usuario
-              </th>
-
-              <th className="px-6 py-4">
-                Correo
-              </th>
-
-              <th className="px-6 py-4">
-                Rol
-              </th>
-
-              <th className="px-6 py-4 text-right">
-                Acciones
-              </th>
-
-            </tr>
-
-          </thead>
-
-          <motion.tbody
-            variants={contenedorVariantes}
-            initial="oculto"
-            animate="visible"
-            className="divide-y divide-gray-100 dark:divide-gray-800/40"
-          >
-
-            <AnimatePresence>
-
-              {usuarios.map(
-                (usuario) => {
-
-                  const esMiCuenta =
-                    usuario.id ===
-                    miUsuarioId
-
-                  const procesando =
-                    usuarioProcesandoId ===
-                    usuario.id
-
-                  return (
-
-                    <motion.tr
-                      key={usuario.id}
-                      variants={elementoVariantes}
-                      initial="oculto"
-                      animate="visible"
-                      exit="salida"
-                      className="hover:bg-gray-50/30 dark:hover:bg-gray-800/20"
-                    >
-
-                      <td className="px-6 py-4 whitespace-nowrap">
-
-                        <span className="text-xs font-mono font-bold text-gray-500 dark:text-[#a8b3ae]">
-                          #{usuario.id}
-                        </span>
-
-                      </td>
-
-                      <td className="px-6 py-4 whitespace-nowrap">
-
-                        <div className="flex items-center gap-3">
-
-                          <div className="w-9 h-9 rounded-full bg-[#f1f8f4] dark:bg-[#0f1512] flex items-center justify-center text-[#218739] dark:text-[#2fa350] font-black">
-                            {usuario.nombre
-                              ?.charAt(0)
-                              ?.toUpperCase()}
-                          </div>
-
-                          <div>
-
-                            <div className="text-xs font-extrabold text-gray-800 dark:text-[#f2f5f3]">
-                              {usuario.nombre}
-                            </div>
-
-                            {esMiCuenta && (
-                              <span className="text-[10px] text-gray-400">
-                                Tu cuenta
-                              </span>
-                            )}
-
-                          </div>
-
-                        </div>
-
-                      </td>
-
-                      <td className="px-6 py-4">
-
-                        <span className="text-xs text-gray-600 dark:text-[#a8b3ae]">
-                          {usuario.correo}
-                        </span>
-
-                      </td>
-
-                      <td className="px-6 py-4">
-
-                        {usuario.es_admin ? (
-
-                          <Badge
-                            tipo="admin"
-                            texto="Administrador"
-                          />
-
-                        ) : (
-
-                          <Badge
-                            tipo="usuario"
-                            texto="Usuario"
-                          />
-
-                        )}
-
-                      </td>
-
-                      <td className="px-6 py-4">
-
-                        <div className="flex items-center justify-end gap-2">
-
-                          <LoadingButton
-                            cargando={
-                              procesando
-                            }
-                            texto={
-                              usuario.es_admin
-                                ? 'Quitar admin'
-                                : 'Hacer admin'
-                            }
-                            textoCargando="..."
-                            variante={
-                              usuario.es_admin
-                                ? 'secundario'
-                                : 'admin'
-                            }
-                            onClick={() =>
-                              cambiarAdministrador(
-                                usuario.id
-                              )
-                            }
-                            deshabilitado={
-                              esMiCuenta ||
-                              procesando
-                            }
-                          />
-
-                          <LoadingButton
-                            cargando={
-                              procesando
-                            }
-                            texto="Eliminar"
-                            textoCargando="..."
-                            variante="peligro"
-                            onClick={() =>
-                              eliminarUsuario(
-                                usuario.id
-                              )
-                            }
-                            deshabilitado={
-                              esMiCuenta ||
-                              procesando
-                            }
-                          />
-
-                        </div>
-
-                      </td>
-
-                    </motion.tr>
-
-                  )
-                }
-              )}
-
-            </AnimatePresence>
-
-          </motion.tbody>
-
-        </table>
-
-      </div>
-
-    )}
-
-  </section>
-
-) : pestañaActiva === 'reportes' ? (
-
-          /* =====================================================
-             PESTAÑA REPORTES
-          ===================================================== */
-
-          <section className="bg-white dark:bg-[#1a2320] rounded-3xl border border-gray-100 dark:border-gray-800/40 shadow-xs overflow-hidden">
-
-            <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-800/40 bg-gray-50/30 dark:bg-[#121816]/30">
-
-              <div className="flex items-center justify-between gap-4 flex-wrap">
-
-                <div>
-
-                  <h3 className="text-base font-extrabold text-gray-800 dark:text-[#f2f5f3]">
-                    Reportes de puntos ecológicos
-                  </h3>
-
-                  <p className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-1">
-                    Revisa los avisos enviados por la comunidad y registra la decisión administrativa.
-                  </p>
-
-                </div>
-
-                <Badge
-                  tipo="pendiente"
-                  texto={`${reportes.filter((reporte) => (reporte.estado || 'pendiente') === 'pendiente').length} pendientes`}
-                />
-
-              </div>
-
-            </div>
-
-            {cargando ? (
-
-              <div className="p-8 text-center text-sm text-gray-400">
-                ⏳ Cargando reportes...
-              </div>
-
-            ) : reportes.length === 0 ? (
-
-              <EmptyState
-                titulo="No hay reportes"
-                descripcion="Todavía no hay reportes registrados o la ruta de reportes no está disponible."
-                icono="🚩"
-              />
-
-            ) : (
-
-              <div className="divide-y divide-gray-100 dark:divide-gray-800/40">
-
-                {reportes.map(
-                  (reporte) => {
-
-                    const reporteId =
-                      reporte.id ??
-                      reporte.reporte_id
-
-                    const estadoReporte =
-                      reporte.estado ||
-                      'pendiente'
-
-                    const pendiente =
-                      estadoReporte ===
-                      'pendiente'
-
-                    const nombrePunto =
-                      reporte.punto_nombre ||
-                      reporte.nombre_punto ||
-                      reporte.punto?.nombre ||
-                      `Punto #${reporte.punto_id ?? '—'}`
-
-                    const nombreReportante =
-                      reporte.nombre_usuario ||
-                      reporte.usuario_nombre ||
-                      reporte.reportante_nombre ||
-                      reporte.reportante?.nombre ||
-                      reporte.usuario?.nombre ||
-                      `Usuario #${reporte.usuario_id ?? '—'}`
-
-                    const correoReportante =
-                      reporte.correo_usuario ||
-                      reporte.usuario_correo ||
-                      reporte.reportante_correo ||
-                      reporte.reportante?.correo ||
-                      reporte.usuario?.correo ||
-                      ''
-
-                    const motivo =
-                      reporte.motivo ||
-                      'Sin motivo indicado'
-
-                    const fecha =
-                      reporte.fecha_creacion ||
-                      reporte.fecha ||
-                      reporte.created_at
-
-                    const fechaLegible =
-                      fecha
-                        ? new Date(
-                            fecha
-                          ).toLocaleString(
-                            'es-CO',
-                            {
-                              dateStyle:
-                                'medium',
-                              timeStyle:
-                                'short'
-                            }
-                          )
-                        : 'Fecha no disponible'
-
-                    const procesandoReporte =
-                      reporteProcesandoId ===
-                      reporteId
-
-                    return (
-
-                      <article
-                        key={reporteId}
-                        className="p-5 sm:p-6 space-y-4"
-                      >
-
-                        <div className="flex items-start justify-between gap-3 flex-wrap">
-
-                          <div>
-
-                            <h4 className="text-sm font-extrabold text-gray-900 dark:text-[#f2f5f3]">
-                              {nombrePunto}
-                            </h4>
-
-                            <p className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-1">
-
-                              Reportado por{' '}
-
-                              <span className="font-bold">
-                                {nombreReportante}
-                              </span>
-
-                              {correoReportante
-                                ? ` · ${correoReportante}`
-                                : ''}
-
-                            </p>
-
-                            <p className="text-[11px] text-gray-400 mt-1">
-                              Fecha: {fechaLegible}
-                            </p>
-
-                          </div>
-
-                          <Badge
-                            tipo={
-                              estadoReporte ===
-                              'revisado'
-                                ? 'aprobado'
-                                : estadoReporte ===
-                                  'descartado'
-                                  ? 'rechazado'
-                                  : 'pendiente'
-                            }
-                            texto={
-                              estadoReporte
-                            }
-                          />
-
-                        </div>
-
-                        <div className="rounded-xl bg-gray-50 dark:bg-[#121816] p-4">
-
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">
-                            Motivo del reporte
-                          </p>
-
-                          <p className="text-sm text-gray-700 dark:text-[#f2f5f3] whitespace-pre-wrap break-words">
-                            {motivo}
-                          </p>
-
-                        </div>
-
-                        {reporte.observacion_admin && (
-
-                          <div className="rounded-xl border border-gray-100 dark:border-gray-800/40 p-3">
-
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">
-                              Observación administrativa
-                            </p>
-
-                            <p className="text-xs text-gray-600 dark:text-[#a8b3ae] whitespace-pre-wrap break-words">
-                              {reporte.observacion_admin}
-                            </p>
-
-                          </div>
-
-                        )}
-
-                        {pendiente && (
-
-                          <div className="space-y-3">
-
-                            <label className="block">
-
-                              <span className="block text-xs font-bold text-gray-600 dark:text-[#a8b3ae] mb-1.5">
-                                Observación administrativa (opcional)
-                              </span>
-
-                              <textarea
-                                value={
-                                  observacionesReportes[
-                                    reporteId
-                                  ] || ''
-                                }
-                                onChange={(
-                                  evento
-                                ) =>
-                                  setObservacionesReportes(
-                                    (
-                                      actuales
-                                    ) => ({
-                                      ...actuales,
-                                      [reporteId]:
-                                        evento
-                                          .target
-                                          .value
-                                    })
-                                  )
-                                }
-                                rows={2}
-                                maxLength={1000}
-                                placeholder="Añade una nota sobre la decisión, si es necesario..."
-                                disabled={
-                                  procesandoReporte
-                                }
-                                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#0f1512] text-sm text-gray-800 dark:text-[#f2f5f3] placeholder:text-gray-400 p-3 outline-none focus:ring-2 focus:ring-[#218739]/30 focus:border-[#218739] disabled:opacity-50"
-                              />
-
-                            </label>
-
-                            <div className="flex flex-wrap justify-end gap-2">
-
-                              <LoadingButton
-                                cargando={
-                                  procesandoReporte
-                                }
-                                texto="Marcar como revisado"
-                                textoCargando="Guardando..."
-                                variante="primario"
-                                onClick={() =>
-                                  revisarReporte(
-                                    reporteId,
-                                    'revisado'
-                                  )
-                                }
-                                deshabilitado={
-                                  reporteId ==
-                                    null ||
-                                  reporteProcesandoId !==
-                                    null
-                                }
-                              />
-
-                              <LoadingButton
-                                cargando={
-                                  procesandoReporte
-                                }
-                                texto="Descartar reporte"
-                                textoCargando="Guardando..."
-                                variante="peligro"
-                                onClick={() =>
-                                  revisarReporte(
-                                    reporteId,
-                                    'descartado'
-                                  )
-                                }
-                                deshabilitado={
-                                  reporteId ==
-                                    null ||
-                                  reporteProcesandoId !==
-                                    null
-                                }
-                              />
-
-                            </div>
-
-                          </div>
-
-                        )}
-
-                      </article>
-
-                    )
-                  }
-                )}
-
-              </div>
-
-            )}
-
-          </section>
-
-        ) : pestañaActiva ===
-          'pendientes' ? (
-
-          /* =====================================================
-             PESTAÑA PENDIENTES
-          ===================================================== */
-
-          <section className="bg-white dark:bg-[#1a2320] rounded-3xl border border-gray-100 dark:border-gray-800/40 shadow-xs overflow-hidden">
-
-            <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-800/40 flex items-center justify-between bg-gray-50/30 dark:bg-[#121816]/30">
-
-              <div>
-
-                <h3 className="text-base font-extrabold text-gray-800 dark:text-[#f2f5f3]">
-                  Puntos Pendientes de Verificación
-                </h3>
-
-                <p className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-1">
-                  Revisa la información antes de aprobar o rechazar un punto enviado por la comunidad.
-                </p>
-
-              </div>
-
-              <Badge
-                tipo="pendiente"
-                texto={`${puntosPendientes.length} pendientes`}
-              />
-
-            </div>
-
-            {cargando ? (
-
-              <div className="p-8 text-center text-gray-400">
-                ⏳ Cargando puntos...
-              </div>
-
-            ) : puntosPendientes.length ===
-              0 ? (
-
-              <EmptyState
-                titulo="¡Bandeja al día!"
-                descripcion="No hay puntos pendientes de verificación en este momento."
-                icono="🎉"
-              />
-
-            ) : (
-
-              <div className="overflow-x-auto">
-
-                <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800/40">
-
-                  <thead>
-
-                    <tr className="bg-gray-50/30 dark:bg-[#121816]/30 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">
-
-                      <th className="px-6 py-4">
-                        Punto ecológico
-                      </th>
-
-                      <th className="px-6 py-4">
-                        Descripción
-                      </th>
-
-                      <th className="px-6 py-4">
-                        Ubicación
-                      </th>
-
-                      <th className="px-6 py-4">
-                        Creador
-                      </th>
-
-                      <th className="px-6 py-4 text-right">
-                        Acciones
-                      </th>
-
-                    </tr>
-
-                  </thead>
-
-                  <motion.tbody
-                    variants={contenedorVariantes}
-                    initial="oculto"
-                    animate="visible"
-                    className="divide-y divide-gray-100 dark:divide-gray-800/40"
-                  >
-
-                    <AnimatePresence>
-
-                      {puntosPendientes.map(
-                        (punto) => {
-
-                          const creador =
-                            obtenerCreador(
-                              punto.usuario_id
-                            )
-
-                          return (
-
-                            <motion.tr
-                              key={punto.id}
-                              variants={
-                                elementoVariantes
-                              }
-                              initial="oculto"
-                              animate="visible"
-                              exit="salida"
-                            >
-
-                              <td className="px-6 py-4 whitespace-nowrap">
-
-                                <div className="font-extrabold text-gray-900 dark:text-[#f2f5f3] text-sm">
-                                  {punto.nombre}
-                                </div>
-
-                                <div className="mt-1.5">
-                                  <CategoriasBadges
-                                    categorias={
-                                      punto.categorias
-                                    }
-                                  />
-                                </div>
-
-                              </td>
-
-                              <td className="px-6 py-4">
-
-                                <p
-                                  className="text-xs text-gray-500 dark:text-[#a8b3ae] max-w-xs"
-                                  title={
-                                    punto.descripcion
-                                  }
-                                >
-                                  {punto.descripcion}
-                                </p>
-
-                              </td>
-
-                              <td className="px-6 py-4">
-
-                                <div className="text-xs text-gray-800 dark:text-[#f2f5f3] font-bold">
-                                  {punto.direccion}
-                                </div>
-
-                                <div className="text-[11px] text-gray-400 mt-0.5">
-                                  {punto.localidad}
-                                </div>
-
-                                <div className="text-[10px] text-gray-400 font-mono mt-0.5">
-                                  {Number(
-                                    punto.latitud
-                                  ).toFixed(5)}
-                                  {', '}
-                                  {Number(
-                                    punto.longitud
-                                  ).toFixed(5)}
-                                </div>
-
-                              </td>
-
-                              <td className="px-6 py-4 whitespace-nowrap">
-
-                                {creador ? (
-
-                                  <div>
-
-                                    <div className="text-xs font-bold text-gray-800 dark:text-[#f2f5f3]">
-                                      {creador.nombre}
-                                    </div>
-
-                                    <div className="text-[11px] text-gray-400 mt-0.5">
-                                      {creador.correo}
-                                    </div>
-
-                                    <div className="text-[10px] text-gray-400 mt-0.5">
-                                      ID: {creador.id}
-                                    </div>
-
-                                  </div>
-
-                                ) : (
-
-                                  <span className="text-xs text-gray-500">
-                                    Usuario #{punto.usuario_id}
-                                  </span>
-
-                                )}
-
-                              </td>
-
-                              <td className="px-6 py-4 whitespace-nowrap">
-
-                                <div className="flex items-center justify-end gap-2">
-
-                                  <LoadingButton
-                                    cargando={
-                                      procesandoId ===
-                                      punto.id
-                                    }
-                                    texto="Aprobar"
-                                    variante="primario"
-                                    onClick={() =>
-                                      cambiarEstado(
-                                        punto.id,
-                                        'aprobar'
-                                      )
-                                    }
-                                    deshabilitado={
-                                      procesandoId !==
-                                      null
-                                    }
-                                  />
-
-                                  <LoadingButton
-                                    cargando={
-                                      procesandoId ===
-                                      punto.id
-                                    }
-                                    texto="Rechazar"
-                                    variante="peligro"
-                                    onClick={() =>
-                                      setPuntoARechazar(
-                                        punto
-                                      )
-                                    }
-                                    deshabilitado={
-                                      procesandoId !==
-                                      null
-                                    }
-                                  />
-
-                                </div>
-
-                              </td>
-
-                            </motion.tr>
-
-                          )
-                        }
-                      )}
-
-                    </AnimatePresence>
-
-                  </motion.tbody>
-
-                </table>
-
-              </div>
-
-            )}
-
-          </section>
-
-        ) : (
-
-          /* =====================================================
-             RESUMEN
-          ===================================================== */
-
-          <section className="bg-white dark:bg-[#1a2320] p-6 sm:p-8 rounded-3xl border border-gray-100 dark:border-gray-800/40 shadow-xs space-y-6">
-
+    <div className="min-h-[calc(100vh-4rem)] bg-[#f1f8f4] dark:bg-[#0f1512] text-gray-800 dark:text-[#f2f5f3]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-10 flex flex-col lg:flex-row gap-6 lg:gap-10">
+        <BarraLateral usuario={usuarioSesion} seccion={seccion} onSeccion={irA} contadores={contadores} />
+
+        <main className="flex-1 min-w-0">
+          {/* ENCABEZADO DE LA SECCIÓN */}
+          <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6">
             <div>
-
-              <h3 className="text-sm font-bold text-gray-700 dark:text-[#f2f5f3]">
-                Proporción de Estado de Puntos Ecológicos
-              </h3>
-
-              <p className="text-xs text-gray-400 mt-1">
-                Distribución actual entre puntos aprobados y pendientes.
-              </p>
-
+              <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-[#218739] dark:text-[#2fa350]">{encabezado.grupo}</p>
+              <h1 className="mt-1.5 text-3xl sm:text-4xl font-black tracking-tight text-gray-900 dark:text-white">{encabezado.titulo}</h1>
+              <p className="mt-2 text-sm text-gray-500 dark:text-[#a8b3ae] max-w-2xl">{encabezado.texto}</p>
             </div>
 
-            {totalPuntosSum > 0 ? (
+            <div className="flex items-center gap-3 shrink-0">
+              {ultimaActualizacion && (
+                <p className="hidden md:block text-xs text-gray-500 dark:text-[#a8b3ae]">
+                  Actualizado a las {ultimaActualizacion.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              )}
+              <BotonAccion variante="secundario" onClick={cargarDatos} cargando={cargando} textoCargando="Actualizando..." className="bg-white dark:bg-[#1a2320] border border-gray-200 dark:border-gray-800/60">
+                <span aria-hidden="true">↻</span> Actualizar
+              </BotonAccion>
+            </div>
+          </header>
 
-              <div>
+          {/* CONTENIDO */}
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={seccion}
+              initial={reducido ? { opacity: 0 } : { opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reducido ? { opacity: 0 } : { opacity: 0, y: -6 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+            >
+              {seccion === 'resumen' && (
+                <SeccionResumen
+                  nombreAdmin={usuarioSesion?.nombre}
+                  usuarios={usuarios}
+                  todosLosPuntos={todosLosPuntos}
+                  puntosPendientes={puntosPendientes}
+                  entregas={entregas}
+                  reportes={reportes}
+                  cargando={cargando}
+                  irA={irA}
+                />
+              )}
 
-                <div className="w-full bg-gray-100 dark:bg-[#0f1512] h-5 rounded-full overflow-hidden flex">
+              {seccion === 'pendientes' && (
+                <SeccionPendientes
+                  puntosPendientes={puntosPendientes}
+                  obtenerCreador={obtenerCreador}
+                  procesandoId={procesandoId}
+                  onAprobar={(id) => cambiarEstado(id, 'aprobar')}
+                  onRechazar={setPuntoARechazar}
+                  cargando={cargando}
+                />
+              )}
 
-                  <motion.div
-                    initial={{
-                      width: 0
-                    }}
-                    animate={{
-                      width: `${porcentajeAprobados}%`
-                    }}
-                    transition={{
-                      duration: 1,
-                      ease: 'easeOut'
-                    }}
-                    className="bg-gradient-to-r from-[#218739] to-[#4caf68]"
-                  />
+              {seccion === 'entregas' && (
+                <SeccionEntregas
+                  entregas={entregas}
+                  filtro={filtroEntregas}
+                  onFiltro={setFiltroEntregas}
+                  busqueda={busquedaEntregas}
+                  onBusqueda={setBusquedaEntregas}
+                  entregaProcesandoId={entregaProcesandoId}
+                  onVerificar={(id) => revisarEntrega(id, 'verificada')}
+                  onRechazar={setEntregaARechazar}
+                  cargando={cargando}
+                />
+              )}
 
-                  <motion.div
-                    initial={{
-                      width: 0
-                    }}
-                    animate={{
-                      width: `${porcentajePendientes}%`
-                    }}
-                    transition={{
-                      duration: 1,
-                      ease: 'easeOut'
-                    }}
-                    className="bg-amber-400"
-                  />
+              {seccion === 'reportes' && (
+                <SeccionReportes
+                  reportes={reportes}
+                  filtro={filtroReportes}
+                  onFiltro={setFiltroReportes}
+                  observaciones={observacionesReportes}
+                  onObservacion={(id, texto) => setObservacionesReportes((actuales) => ({ ...actuales, [id]: texto }))}
+                  reporteProcesandoId={reporteProcesandoId}
+                  onRevisar={revisarReporte}
+                  cargando={cargando}
+                />
+              )}
 
-                </div>
+              {seccion === 'puntos' && (
+                <SeccionPuntos
+                  todosLosPuntos={todosLosPuntos}
+                  obtenerCreador={obtenerCreador}
+                  filtro={filtroPuntos}
+                  onFiltro={setFiltroPuntos}
+                  busqueda={busquedaPuntos}
+                  onBusqueda={setBusquedaPuntos}
+                  puntoEliminandoId={puntoEliminandoId}
+                  puntoRevisandoId={puntoRevisandoId}
+                  onEliminar={(punto) => setConfirmacion({ tipo: 'punto', elemento: punto })}
+                  onMarcarRevisado={marcarPuntoRevisado}
+                  cargando={cargando}
+                />
+              )}
 
-                <div className="flex justify-between mt-4 text-xs font-semibold text-gray-500 dark:text-[#a8b3ae]">
+              {seccion === 'usuarios' && (
+                <SeccionUsuarios
+                  usuarios={usuarios}
+                  todosLosPuntos={todosLosPuntos}
+                  entregas={entregas}
+                  miUsuarioId={miUsuarioId}
+                  filtro={filtroUsuarios}
+                  onFiltro={setFiltroUsuarios}
+                  busqueda={busquedaUsuarios}
+                  onBusqueda={setBusquedaUsuarios}
+                  usuarioProcesandoId={usuarioProcesandoId}
+                  onCambiarAdmin={cambiarAdministrador}
+                  onEliminar={(usuario) => setConfirmacion({ tipo: 'usuario', elemento: usuario })}
+                  cargando={cargando}
+                />
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </main>
+      </div>
 
-                  <span>
-                    🟢 Aprobados:{' '}
-                    <strong>
-                      {puntosAprobados.length}
-                    </strong>{' '}
-                    ({porcentajeAprobados}%)
-                  </span>
+      {/* AVISOS */}
+      <Avisos mensaje={mensaje} error={error} onCerrarMensaje={() => setMensaje('')} onCerrarError={() => setError('')} />
 
-                  <span>
-                    🟡 Pendientes:{' '}
-                    <strong>
-                      {puntosPendientes.length}
-                    </strong>{' '}
-                    ({porcentajePendientes}%)
-                  </span>
-
-                </div>
-
-              </div>
-
-            ) : (
-
-              <p className="text-xs text-gray-400 italic">
-                No hay puntos ecológicos registrados en el sistema.
-              </p>
-
-            )}
-
-          </section>
-
-        )}
-
-      </main>
-
-      {/* MODAL PARA RECHAZAR UN PUNTO CON MOTIVO */}
-
+      {/* MODAL: RECHAZAR PUNTO */}
       <AnimatePresence>
         {puntoARechazar && (
           <ModalRechazo
-            key={puntoARechazar.id}
-            punto={puntoARechazar}
+            key={`punto-${puntoARechazar.id}`}
+            elemento={puntoARechazar}
             procesando={procesandoId === puntoARechazar.id}
             onCancelar={() => setPuntoARechazar(null)}
             onConfirmar={confirmarRechazo}
@@ -3767,13 +739,12 @@ function Admin() {
         )}
       </AnimatePresence>
 
-      {/* MODAL PARA RECHAZAR UNA ENTREGA CON MOTIVO */}
-
+      {/* MODAL: RECHAZAR ENTREGA */}
       <AnimatePresence>
         {entregaARechazar && (
           <ModalRechazo
             key={`entrega-${entregaARechazar.id}`}
-            punto={{
+            elemento={{
               nombre: `Entrega #${entregaARechazar.id} · ${entregaARechazar.usuario_nombre}`,
               direccion: entregaARechazar.punto_nombre
             }}
@@ -3784,14 +755,34 @@ function Admin() {
             subtitulo="El usuario verá este motivo en su historial de entregas."
             etiqueta="Entrega seleccionada"
             textoConfirmar="Rechazar entrega"
-            placeholder="Ej.: la cantidad registrada no coincide con lo recibido en el punto..."
+            placeholder="Ej.: la cantidad registrada no coincide con lo recibido en el punto."
           />
         )}
       </AnimatePresence>
 
+      {/* MODAL: CONFIRMAR ELIMINACIÓN */}
+      <AnimatePresence>
+        {confirmacion && (
+          <ModalConfirmacion
+            key={`${confirmacion.tipo}-${confirmacion.elemento.id}`}
+            titulo={confirmacion.tipo === 'punto' ? '¿Eliminar este punto?' : '¿Eliminar esta cuenta?'}
+            etiqueta={confirmacion.tipo === 'punto' ? 'Punto' : 'Usuario'}
+            nombre={confirmacion.elemento.nombre}
+            detalle={confirmacion.tipo === 'punto' ? confirmacion.elemento.direccion && `📍 ${confirmacion.elemento.direccion}` : confirmacion.elemento.correo}
+            descripcion={
+              confirmacion.tipo === 'punto'
+                ? 'También se eliminarán sus reseñas, reportes, entregas y categorías asociadas.'
+                : 'También se eliminarán los puntos y las entregas de esta persona.'
+            }
+            textoConfirmar={confirmacion.tipo === 'punto' ? 'Eliminar punto' : 'Eliminar cuenta'}
+            procesando={confirmacion.tipo === 'punto' ? puntoEliminandoId === confirmacion.elemento.id : usuarioProcesandoId === confirmacion.elemento.id}
+            onCancelar={() => setConfirmacion(null)}
+            onConfirmar={confirmarEliminacion}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }
 
 export default Admin
-
