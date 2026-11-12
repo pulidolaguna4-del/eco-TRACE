@@ -21,6 +21,17 @@ app.use(
 
 app.use(express.json())
 
+// Fotos subidas. Los nombres son aleatorios y nosniff evita que el
+// navegador interprete un archivo como otra cosa que una imagen.
+app.use(
+  config.archivos.rutaPublica,
+  express.static(config.archivos.directorio, {
+    index: false,
+    maxAge: '7d',
+    setHeaders: (res) => res.setHeader('X-Content-Type-Options', 'nosniff')
+  })
+)
+
 app.use(routes)
 
 app.use(notFound)

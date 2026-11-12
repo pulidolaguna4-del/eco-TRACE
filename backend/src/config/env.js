@@ -3,6 +3,7 @@
 // =========================================================
 
 import 'dotenv/config'
+import path from 'node:path'
 
 function requerida(nombre, mensaje) {
   const valor = process.env[nombre]
@@ -42,6 +43,14 @@ export const config = {
     port: Number(process.env.EMAIL_PORT ?? 587),
     user: emailUser,
     password: emailPassword
+  },
+
+  // Archivos subidos (fotos de entregas). En Docker es un volumen.
+  // En la base de datos solo se guarda la ruta pública: /uploads/entregas/<archivo>
+  archivos: {
+    directorio: path.resolve(process.env.UPLOADS_DIR ?? 'uploads'),
+    rutaPublica: '/uploads',
+    fotoMaxBytes: 5 * 1024 * 1024
   },
 
   // Orígenes permitidos: localhost / 127.0.0.1 en cualquier puerto

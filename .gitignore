@@ -25,3 +25,5 @@ frontend/.env
 # Editor / OS
 .vscode/
 .DS_Store
+# Fotos subidas por los usuarios
+backend/uploads/

@@ -7,6 +7,7 @@
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 
 import { ESTADOS_CONSERVACION } from '../../utils/puntoUtils'
+import { urlArchivo } from '../../utils/archivos'
 import { claseTarjeta, Avatar, BotonAccion, Buscador, EstadoVacio, Esqueleto, FiltroChips, Insignia, TextoPestañaNueva } from './ui'
 import { coincide, formatearFecha, formatearNumero, haceCuanto, TIPOS_ENTREGA, ESTADO_A_INSIGNIA, NOMBRE_ESTADO, variantesItem } from './utilidades'
 
@@ -144,8 +145,22 @@ export default function SeccionEntregas({ entregas, filtro, onFiltro, busqueda, 
                         </p>
                       )}
                       {entrega.foto_url && (
-                        <a href={entrega.foto_url} target="_blank" rel="noreferrer" className="text-xs font-bold text-[#218739] dark:text-[#2fa350] hover:underline underline-offset-2 shrink-0">
-                          <span aria-hidden="true">📷</span> Ver foto <span aria-hidden="true">↗</span><TextoPestañaNueva />
+                        <a
+                          href={urlArchivo(entrega.foto_url)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="group relative shrink-0 block w-24 h-24 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-[#0f1512] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#218739]"
+                        >
+                          <img
+                            src={urlArchivo(entrega.foto_url)}
+                            alt={`Foto de la entrega de ${entrega.usuario_nombre}`}
+                            loading="lazy"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                          <span className="absolute inset-x-0 bottom-0 bg-black/55 text-white text-[11px] font-bold text-center py-0.5">
+                            Ampliar <span aria-hidden="true">↗</span>
+                          </span>
+                          <TextoPestañaNueva />
                         </a>
                       )}
                     </div>

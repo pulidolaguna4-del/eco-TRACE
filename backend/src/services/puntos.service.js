@@ -4,6 +4,7 @@
 
 import { prisma } from '../config/prisma.js'
 import { HttpError } from '../utils/HttpError.js'
+import { borrarFotos } from '../utils/archivos.js'
 import { enviarNotificacionPunto } from './email.service.js'
 
 const CON_CATEGORIAS = {
@@ -131,6 +132,11 @@ export async function eliminar(puntoId) {
     throw new HttpError(404, 'Punto no encontrado')
   }
 
+  const fotos = await prisma.entrega.findMany({
+    where: { punto_id: puntoId, foto_url: { not: null } },
+    select: { foto_url: true }
+  })
+
   await prisma.$transaction([
     prisma.resena.deleteMany({ where: { punto_id: puntoId } }),
     prisma.reporte.deleteMany({ where: { punto_id: puntoId } }),
@@ -138,6 +144,9 @@ export async function eliminar(puntoId) {
     prisma.puntoCategoria.deleteMany({ where: { punto_id: puntoId } }),
     prisma.punto.delete({ where: { id: puntoId } })
   ])
+
+  // Las fotos se borran del disco solo si la transacción se completó
+  await borrarFotos(fotos.map((f) => f.foto_url))
 
   return { mensaje: 'Punto eliminado correctamente' }
 }

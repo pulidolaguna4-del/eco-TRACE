@@ -4,6 +4,7 @@
 
 import { prisma } from '../config/prisma.js'
 import { HttpError } from '../utils/HttpError.js'
+import { borrarFotos } from '../utils/archivos.js'
 import { hashPassword, verificarPassword } from '../utils/password.js'
 import { recalcular as recalcularCalificacion } from './resenas.service.js'
 
@@ -97,6 +98,11 @@ export async function eliminarConDatos(usuarioId, adminId) {
     select: { punto_id: true }
   })
 
+  const fotos = await prisma.entrega.findMany({
+    where: { ...delUsuarioOSusPuntos, foto_url: { not: null } },
+    select: { foto_url: true }
+  })
+
   try {
     await prisma.$transaction([
       prisma.resena.deleteMany({ where: delUsuarioOSusPuntos }),
@@ -111,6 +117,8 @@ export async function eliminarConDatos(usuarioId, adminId) {
     console.error('ERROR AL ELIMINAR USUARIO:', error)
     throw new HttpError(500, 'No se pudo eliminar el usuario y sus datos relacionados')
   }
+
+  await borrarFotos(fotos.map((f) => f.foto_url))
 
   for (const { punto_id } of calificados) {
     await recalcularCalificacion(punto_id)

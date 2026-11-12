@@ -39,6 +39,10 @@ services:
       EMAIL_USER: ${EMAIL_USER:?Falta EMAIL_USER en .env}
       EMAIL_PASSWORD: ${EMAIL_PASSWORD:?Falta EMAIL_PASSWORD en .env}
 
+    # Fotos de las entregas: el volumen las conserva al reconstruir
+    volumes:
+      - uploads_data:/app/uploads
+
     depends_on:
       postgres:
         condition: service_healthy
@@ -58,3 +62,4 @@ services:
 
 volumes:
   postgres_data:
+  uploads_data:

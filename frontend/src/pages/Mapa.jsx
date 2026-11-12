@@ -34,6 +34,7 @@ import {
   formatearMensajeError,
   tipoDeCategoria
 } from '../utils/puntoUtils'
+import { comprimirFoto, formatearTamaño, FOTO_MAX_BYTES, TIPOS_FOTO } from '../utils/archivos'
 import { CategoriasBadges } from '../components/CategoriasBadges'
 import ResenasPunto, { Estrellas } from '../components/ResenasPunto'
 
@@ -188,8 +189,7 @@ function formularioEntregaVacio(categoria = '') {
     cantidad: '',
     unidad: unidadPorDefecto(tipo),
     peso: '',
-    estado_conservacion: '',
-    foto_url: ''
+    estado_conservacion: ''
   }
 }
 
@@ -259,6 +259,23 @@ function Mapa() {
   const [errorEntrega, setErrorEntrega] = useState('')
 
   const [guardandoEntrega, setGuardandoEntrega] = useState(false)
+
+  // Foto adjunta a la entrega (ya comprimida) y su vista previa
+  const [fotoEntrega, setFotoEntrega] = useState(null)
+  const [vistaFoto, setVistaFoto] = useState('')
+  const [procesandoFoto, setProcesandoFoto] = useState(false)
+  const [arrastrandoFoto, setArrastrandoFoto] = useState(false)
+  const refInputFoto = useRef(null)
+
+  useEffect(() => {
+    if (!fotoEntrega) {
+      setVistaFoto('')
+      return
+    }
+    const url = URL.createObjectURL(fotoEntrega)
+    setVistaFoto(url)
+    return () => URL.revokeObjectURL(url)
+  }, [fotoEntrega])
 
 
   // =======================================================
@@ -1130,6 +1147,7 @@ const abrirFormularioEntrega = (punto) => {
   setObservacionEntrega('')
   setMensajeEntrega('')
   setErrorEntrega('')
+  quitarFotoEntrega()
 }
 
 const cerrarFormularioEntrega = () => {
@@ -1141,6 +1159,46 @@ const cerrarFormularioEntrega = () => {
   setObservacionEntrega('')
   setMensajeEntrega('')
   setErrorEntrega('')
+  quitarFotoEntrega()
+}
+
+// =======================================================
+// FOTO DE LA ENTREGA
+// =======================================================
+
+const quitarFotoEntrega = () => {
+  setFotoEntrega(null)
+  if (refInputFoto.current) refInputFoto.current.value = ''
+}
+
+// Valida el tipo, la comprime y revisa el tamaño final
+const elegirFotoEntrega = async (archivo) => {
+  if (!archivo) return
+  setErrorEntrega('')
+
+  if (!TIPOS_FOTO.includes(archivo.type)) {
+    setErrorEntrega('La foto debe ser una imagen JPG, PNG o WEBP.')
+    quitarFotoEntrega()
+    return
+  }
+
+  setProcesandoFoto(true)
+  const comprimida = await comprimirFoto(archivo)
+  setProcesandoFoto(false)
+
+  if (comprimida.size > FOTO_MAX_BYTES) {
+    setErrorEntrega('La foto no puede pesar más de 5 MB.')
+    quitarFotoEntrega()
+    return
+  }
+
+  setFotoEntrega(comprimida)
+}
+
+const soltarFotoEntrega = (e) => {
+  e.preventDefault()
+  setArrastrandoFoto(false)
+  elegirFotoEntrega(e.dataTransfer.files?.[0])
 }
 
 
@@ -1204,10 +1262,8 @@ const registrarEntrega = async (e) => {
     return
   }
 
-  const fotoUrl = formularioEntrega.foto_url.trim()
-
-  if (fotoUrl && !/^https?:\/\//i.test(fotoUrl)) {
-    setErrorEntrega('La URL de la foto debe empezar por http:// o https://')
+  if (procesandoFoto) {
+    setErrorEntrega('Espera a que termine de cargar la foto.')
     return
   }
 
@@ -1229,23 +1285,30 @@ const registrarEntrega = async (e) => {
       ? Number(formularioEntrega.peso)
       : null,
     estado_conservacion: formularioEntrega.estado_conservacion || null,
-    foto_url: fotoUrl || null,
     observacion: observacionEntrega.trim() || null
   }
+
+  // multipart/form-data: los datos de la entrega y la foto como archivo.
+  // Los campos vacíos no se envían.
+  const formulario = new FormData()
+  Object.entries(datosEnviar).forEach(([campo, valor]) => {
+    if (valor !== null && valor !== undefined && valor !== '') {
+      formulario.append(campo, String(valor))
+    }
+  })
+  if (fotoEntrega) formulario.append('foto', fotoEntrega)
 
   try {
     setGuardandoEntrega(true)
 
+    // Sin Content-Type: el navegador lo pone con el "boundary" del formulario
     const respuesta = await fetch('http://127.0.0.1:8000/entregas', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify(datosEnviar)
+      headers: { Authorization: `Bearer ${token}` },
+      body: formulario
     })
 
-    const datos = await respuesta.json()
+    const datos = await respuesta.json().catch(() => null)
 
     if (!respuesta.ok) {
       setErrorEntrega(
@@ -1264,6 +1327,7 @@ const registrarEntrega = async (e) => {
     })
 
     setObservacionEntrega('')
+    quitarFotoEntrega()
   } catch (err) {
     console.error(err)
     setErrorEntrega('No se pudo conectar con el servidor')
@@ -2428,28 +2492,84 @@ const registrarEntrega = async (e) => {
               </div>
             )}
 
-            {/* FOTO */}
+            {/* FOTO (archivo; en el celular permite tomarla con la cámara) */}
             <div>
-              <label
-                htmlFor="foto-entrega"
-                className="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2"
-              >
-                URL de una foto
+              <p className="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2">
+                Foto de la entrega
                 <span className="font-normal text-gray-400 ml-1">
                   (opcional)
                 </span>
-              </label>
+              </p>
 
+              {/* El input va primero para que la zona reaccione a su foco (peer) */}
               <input
                 id="foto-entrega"
-                type="url"
-                name="foto_url"
-                maxLength={500}
-                placeholder="https://..."
-                value={formularioEntrega.foto_url}
-                onChange={manejarCambioEntrega}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
+                ref={refInputFoto}
+                type="file"
+                accept={TIPOS_FOTO.join(',')}
+                onChange={(e) => elegirFotoEntrega(e.target.files?.[0])}
+                disabled={guardandoEntrega || procesandoFoto}
+                className="peer sr-only"
               />
+
+              {fotoEntrega && vistaFoto ? (
+                <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                  <img
+                    src={vistaFoto}
+                    alt="Vista previa de la foto adjunta"
+                    className="w-16 h-16 shrink-0 rounded-lg object-cover bg-gray-100 dark:bg-gray-900"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{fotoEntrega.name}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{formatearTamaño(fotoEntrega.size)}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => refInputFoto.current?.click()}
+                    disabled={guardandoEntrega}
+                    className="px-3 py-2 rounded-lg text-xs font-bold text-[#176b2b] dark:text-[#2fa350] hover:bg-green-50 dark:hover:bg-green-950/30 cursor-pointer disabled:opacity-50"
+                  >
+                    Cambiar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={quitarFotoEntrega}
+                    disabled={guardandoEntrega}
+                    className="w-9 h-9 shrink-0 rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30 dark:hover:text-red-400 cursor-pointer disabled:opacity-50"
+                    aria-label="Quitar foto"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <label
+                  htmlFor="foto-entrega"
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    setArrastrandoFoto(true)
+                  }}
+                  onDragLeave={() => setArrastrandoFoto(false)}
+                  onDrop={soltarFotoEntrega}
+                  className={`flex flex-col items-center justify-center gap-1 w-full px-4 py-5 rounded-xl border-2 border-dashed text-center cursor-pointer transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-green-500 ${
+                    arrastrandoFoto
+                      ? 'border-green-500 bg-green-50 dark:bg-green-950/30'
+                      : 'border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-green-500 dark:hover:border-green-600'
+                  }`}
+                >
+                  {procesandoFoto ? (
+                    <>
+                      <span className="w-5 h-5 border-2 border-green-600/30 border-t-green-600 rounded-full animate-spin" aria-hidden="true" />
+                      <span className="text-sm font-bold text-gray-700 dark:text-gray-200">Preparando la foto...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-2xl" aria-hidden="true">📷</span>
+                      <span className="text-sm font-bold text-gray-800 dark:text-gray-100">Adjuntar o tomar una foto</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">JPG, PNG o WEBP · máximo 5 MB</span>
+                    </>
+                  )}
+                </label>
+              )}
             </div>
 
             {/* FECHA */}

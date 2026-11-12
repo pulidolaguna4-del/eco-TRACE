@@ -77,10 +77,8 @@ export async function registrar(usuarioId, datos) {
     throw new HttpError(400, 'El peso debe ser mayor que 0')
   }
 
-  const fotoUrl = limpiar(datos.foto_url)
-  if (fotoUrl && !/^https?:\/\//i.test(fotoUrl)) {
-    throw new HttpError(400, 'La URL de la foto debe empezar por http:// o https://')
-  }
+  // Ruta de la foto subida (la asigna el controlador)
+  const fotoUrl = datos.foto_url ?? null
 
   return prisma.entrega.create({
     data: {

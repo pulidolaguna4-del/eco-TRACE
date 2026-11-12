@@ -8,6 +8,7 @@ import {
   ESTADOS_ENTREGA,
   tipoDeCategoria
 } from '../utils/puntoUtils'
+import { urlArchivo } from '../utils/archivos'
 
 // =========================================================
 // UTILIDADES
@@ -80,6 +81,7 @@ function DetalleEntrega({ entrega, onCerrar }) {
   const tipo = tipoEntrega(entrega)
   const conservacion = nombreConservacion(entrega.estado_conservacion)
   const [fotoRota, setFotoRota] = useState(false)
+  const foto = urlArchivo(entrega.foto_url)
 
   useEffect(() => {
     const alPresionar = (e) => e.key === 'Escape' && onCerrar()
@@ -186,7 +188,7 @@ function DetalleEntrega({ entrega, onCerrar }) {
               <p className="text-xs text-gray-500 dark:text-[#a8b3ae]">
                 No se pudo cargar la imagen.{' '}
                 <a
-                  href={entrega.foto_url}
+                  href={foto}
                   target="_blank"
                   rel="noreferrer"
                   className="font-bold text-blue-600 dark:text-blue-400 hover:underline break-all"
@@ -195,9 +197,9 @@ function DetalleEntrega({ entrega, onCerrar }) {
                 </a>
               </p>
             ) : entrega.foto_url ? (
-              <a href={entrega.foto_url} target="_blank" rel="noreferrer">
+              <a href={foto} target="_blank" rel="noreferrer">
                 <img
-                  src={entrega.foto_url}
+                  src={foto}
                   alt={`Foto de la entrega #${entrega.id}`}
                   onError={() => setFotoRota(true)}
                   className="w-full max-h-72 object-cover rounded-2xl border border-gray-100 dark:border-gray-800/40"

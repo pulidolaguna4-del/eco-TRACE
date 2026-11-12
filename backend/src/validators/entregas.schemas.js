@@ -21,10 +21,7 @@ export const registroEntregaSchema = z.object({
   // Peso en kg. Obligatorio solo si la unidad no es "kg".
   peso: decimal.nullish(),
   estado_conservacion: z.enum(ESTADOS_CONSERVACION).nullish(),
-  foto_url: z
-    .string()
-    .max(500, 'String should have at most 500 characters')
-    .nullish(),
+  // La foto llega como archivo (campo `foto`), no como URL
   observacion: textoOpcional
 })
 
