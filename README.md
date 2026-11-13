@@ -1,4 +1,8 @@
-# eco-TRACE 🌿
+<p align="center">
+  <img src="frontend/public/logo/eco-trace-logo.svg" alt="eco-TRACE" width="420">
+</p>
+
+# eco-TRACE
 
 Plataforma web que centraliza y verifica puntos ecológicos (reciclaje, donación de ropa, reciclaje electrónico) en la ciudad.
 

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './RecuperarPassword.css'
+import Logo from '../components/Logo'
 
 function RecuperarPassword() {
   const navigate = useNavigate()
@@ -213,7 +214,9 @@ function RecuperarPassword() {
 
         <div className="recuperar-header">
 
-          <h1>Eco-TRACE</h1>
+          <h1>
+            <Logo className="h-10 w-auto mx-auto" />
+          </h1>
 
           <p>
             Recuperación de contraseña

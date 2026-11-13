@@ -18,6 +18,7 @@ import { CONTENIDO } from '../components/auth/contenido'
 import PanelFoto from '../components/auth/PanelFoto'
 import FormularioLogin from '../components/auth/FormularioLogin'
 import FormularioRegistro from '../components/auth/FormularioRegistro'
+import Logo from '../components/Logo'
 
 const DESLIZAMIENTO = { type: 'spring', stiffness: 60, damping: 17, mass: 0.9 }
 
@@ -88,8 +89,8 @@ function Autenticacion() {
           </AnimatePresence>
           <div className="absolute inset-0 bg-gradient-to-t from-[#0b1f14]/90 via-[#0f2a1b]/40 to-transparent" aria-hidden="true" />
           <div className="absolute bottom-4 left-5 text-white">
-            <p className="text-xl font-black tracking-wide flex items-center gap-2">🌱 eco-TRACE</p>
-            <p className="text-xs text-white/80 font-semibold">📍 Ciudad Bolívar, Bogotá</p>
+            <Logo className="h-7 w-auto" />
+            <p className="text-xs text-white/80 font-semibold mt-1.5">📍 Ciudad Bolívar, Bogotá</p>
           </div>
         </div>
 
@@ -97,9 +98,9 @@ function Autenticacion() {
         <div className="flex items-center justify-between gap-3 px-6 sm:px-10 pt-6">
           <Link
             to="/home"
-            className="hidden lg:inline-flex items-center gap-2 text-sm font-black tracking-wide text-[#218739] dark:text-[#2fa350]"
+            className="hidden lg:inline-flex items-center text-[#218739] dark:text-[#2fa350]"
           >
-            🌱 eco-TRACE
+            <Logo className="h-6 w-auto" titulo="eco-TRACE, ir al inicio" />
           </Link>
 
           <div className="flex items-center gap-3 ml-auto">

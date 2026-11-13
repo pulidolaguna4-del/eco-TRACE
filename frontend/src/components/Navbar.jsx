@@ -13,6 +13,7 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 
 import { useTheme } from '../context/ThemeContext'
+import Logo from './Logo'
 
 const ENLACES = [
   { to: '/home', texto: 'Inicio', icono: '🏠' },
@@ -121,20 +122,11 @@ function Navbar() {
           {/* LOGO */}
           <Link
             to="/home"
-            className={`flex items-center gap-2 text-lg font-black tracking-wide transition-colors ${
+            className={`flex items-center shrink-0 transition-colors ${
               transparente ? 'text-white' : 'text-[#218739] dark:text-[#2fa350]'
             }`}
           >
-            <span
-              className={`w-9 h-9 rounded-xl flex items-center justify-center text-base transition-colors ${
-                transparente
-                  ? 'bg-white/15 backdrop-blur-md border border-white/25'
-                  : 'bg-[#f1f8f4] dark:bg-[#1a2320] border border-[#218739]/15 dark:border-gray-800'
-              }`}
-            >
-              🌱
-            </span>
-            eco-TRACE
+            <Logo className="h-7 w-auto" titulo="eco-TRACE, ir al inicio" />
           </Link>
 
           {/* ENLACES PRINCIPALES (escritorio) */}

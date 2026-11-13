@@ -13,6 +13,7 @@ import { motion, AnimatePresence, useInView, useReducedMotion } from 'framer-mot
 import { API_URL } from '../../config'
 import fotoTransMiCable from '../assets/ciudad-bolivar-transmicable.jpg'
 import fotoLadera from '../assets/ciudad-bolivar-ladera.jpg'
+import Logo from '../components/Logo'
 
 // =========================================================
 // CONTENIDO
@@ -725,10 +726,9 @@ function PiePagina({ sesionActiva }) {
     <footer className="border-t border-gray-100 dark:border-gray-800/50 bg-white dark:bg-[#0b100e]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
         <div className="lg:col-span-2">
-          <p className="flex items-center gap-2 text-lg font-black text-[#218739] dark:text-[#2fa350]">
-            <span className="w-9 h-9 rounded-xl bg-[#f1f8f4] dark:bg-[#1a2320] flex items-center justify-center">🌱</span>
-            eco-TRACE
-          </p>
+          <div className="text-[#218739] dark:text-[#2fa350]">
+            <Logo className="h-8 w-auto" />
+          </div>
           <p className="text-sm text-gray-500 dark:text-[#a8b3ae] mt-4 max-w-sm leading-relaxed">
             El mapa comunitario de puntos de reciclaje, donación de ropa y residuos electrónicos de Ciudad Bolívar, Bogotá.
           </p>
