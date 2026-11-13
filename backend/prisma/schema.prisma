@@ -234,7 +234,9 @@ model Conversacion {
 model Mensaje {
   id              Int       @id @default(autoincrement())
   conversacion_id Int
-  // Null en los mensajes del sistema ("Reservado para ti"...)
+  // En los mensajes del sistema ("Reservado para ti"...) es quien causó
+  // el aviso, para contar los no leídos solo del otro participante.
+  // Null en los avisos del administrador.
   remitente_id    Int?
   texto           String    @db.VarChar(1000)
   // usuario | sistema

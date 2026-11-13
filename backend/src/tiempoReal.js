@@ -60,12 +60,12 @@ export function iniciarTiempoReal(servidorHttp) {
     }
   })
 
-  io.on('connection', async (socket) => {
+  io.on('connection', (socket) => {
     const { id: usuarioId } = socket.data.usuario
     socket.join(`usuario:${usuarioId}`)
 
-    socket.emit('no_leidos', { total: await regalosService.contarNoLeidos(usuarioId) })
-
+    // Los manejadores se registran antes de cualquier await: un evento que
+    // el cliente envíe justo al conectarse no se debe perder.
     socket.on(
       'mensaje:enviar',
       conRespuesta(async ({ conversacion_id, texto }) => ({
@@ -86,6 +86,11 @@ export function iniciarTiempoReal(servidorHttp) {
         // No participa o no existe: se ignora
       }
     })
+
+    regalosService
+      .contarNoLeidos(usuarioId)
+      .then((total) => socket.emit('no_leidos', { total }))
+      .catch((error) => console.error('ERROR EN EL CHAT:', error))
   })
 
   registrarIo(io)

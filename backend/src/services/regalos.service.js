@@ -206,7 +206,10 @@ export async function editar(id, usuarioId, datos) {
 
 // Escribe un mensaje del sistema en cada conversación del regalo
 // (el texto puede depender del interesado) y avisa en tiempo real.
-async function avisarEnConversaciones(regalo, textoPara) {
+// `actorId` es quien causó el aviso: el mensaje se guarda a su nombre
+// para que solo cuente como no leído para el otro participante. Los
+// avisos del administrador van sin remitente (no leídos para los dos).
+async function avisarEnConversaciones(regalo, actorId, textoPara) {
   const conversaciones = await prisma.conversacion.findMany({ where: { regalo_id: regalo.id } })
 
   for (const c of conversaciones) {
@@ -214,7 +217,7 @@ async function avisarEnConversaciones(regalo, textoPara) {
     if (!texto) continue
 
     const creado = await prisma.mensaje.create({
-      data: { conversacion_id: c.id, remitente_id: null, texto, tipo: 'sistema' }
+      data: { conversacion_id: c.id, remitente_id: actorId, texto, tipo: 'sistema' }
     })
     await prisma.conversacion.update({ where: { id: c.id }, data: { fecha_ultimo_mensaje: creado.fecha } })
 
@@ -226,7 +229,8 @@ async function avisarEnConversaciones(regalo, textoPara) {
 
   const participantes = [regalo.usuario_id, ...conversaciones.map((c) => c.interesado_id)]
   emitirAUsuarios(participantes, 'regalo:estado', { regalo_id: regalo.id, estado: regalo.estado })
-  for (const id of new Set(conversaciones.map((c) => c.interesado_id))) await avisarNoLeidos(id)
+  const avisados = actorId === regalo.usuario_id ? conversaciones.map((c) => c.interesado_id) : participantes
+  for (const id of new Set(avisados)) await avisarNoLeidos(id)
 }
 
 export async function reservar(id, usuarioId, interesadoId) {
@@ -250,7 +254,7 @@ export async function reservar(id, usuarioId, interesadoId) {
     include: CON_DATOS
   })
 
-  await avisarEnConversaciones(actualizado, (interesado) =>
+  await avisarEnConversaciones(actualizado, usuarioId, (interesado) =>
     interesado === interesadoId
       ? `🎁 ${regalo.usuario.nombre} reservó este regalo para ti. Acuerden aquí cuándo y dónde recogerlo.`
       : 'Este regalo se reservó para otra persona. Si vuelve a estar disponible, te avisaremos aquí.'
@@ -272,7 +276,7 @@ export async function liberar(id, usuarioId) {
     include: CON_DATOS
   })
 
-  await avisarEnConversaciones(actualizado, () => '🔄 Este regalo volvió a estar disponible.')
+  await avisarEnConversaciones(actualizado, usuarioId, () => '🔄 Este regalo volvió a estar disponible.')
 
   return serializar.regalo(actualizado, { usuarioId })
 }
@@ -290,7 +294,7 @@ export async function entregar(id, usuarioId) {
     include: CON_DATOS
   })
 
-  await avisarEnConversaciones(actualizado, (interesado) =>
+  await avisarEnConversaciones(actualizado, usuarioId, (interesado) =>
     interesado === regalo.reservado_para_id
       ? '✅ Regalo entregado. ¡Gracias por darle una segunda vida!'
       : 'Este regalo ya fue entregado a otra persona.'
@@ -312,7 +316,7 @@ export async function cancelar(id, usuarioId) {
     include: CON_DATOS
   })
 
-  await avisarEnConversaciones(actualizado, () => 'Quien publicó este regalo ya no lo está regalando.')
+  await avisarEnConversaciones(actualizado, usuarioId, () => 'Quien publicó este regalo ya no lo está regalando.')
 
   return serializar.regalo(actualizado, { usuarioId })
 }
@@ -378,10 +382,11 @@ export async function iniciarConversacion(regaloId, usuario) {
   })
 
   // Primer mensaje automático para que quien regala vea el interés
+  // (a nombre del interesado: solo es "no leído" para quien regala)
   const creado = await prisma.mensaje.create({
     data: {
       conversacion_id: conversacion.id,
-      remitente_id: null,
+      remitente_id: usuario.id,
       tipo: 'sistema',
       texto: `👋 A ${usuario.nombre} le interesa este regalo.`
     }
@@ -558,6 +563,7 @@ export async function reportar(regaloId, usuarioId, { motivo, mensaje_id }) {
       (mensaje.conversacion.interesado_id === usuarioId || mensaje.conversacion.regalo.usuario_id === usuarioId)
 
     if (!participa) throw new HttpError(404, 'Mensaje no encontrado')
+    if (mensaje.tipo === 'sistema') throw new HttpError(400, 'Los avisos automáticos no se pueden reportar')
     if (mensaje.remitente_id === usuarioId) throw new HttpError(400, 'No puedes reportar tu propio mensaje')
   } else if (regalo.usuario_id === usuarioId) {
     throw new HttpError(400, 'No puedes reportar tu propio regalo')
@@ -595,7 +601,7 @@ async function contextoMensaje(mensaje) {
 
   const formatear = (m) => ({
     ...serializar.mensaje(m),
-    remitente_nombre: m.remitente?.nombre ?? null,
+    remitente_nombre: m.tipo === 'sistema' ? null : (m.remitente?.nombre ?? null),
     reportado: m.id === mensaje.id
   })
 
@@ -655,7 +661,7 @@ export async function ocultarAdmin(regaloId, { oculto, motivo }) {
   })
 
   if (oculto && !regalo.oculto) {
-    await avisarEnConversaciones(actualizado, () => 'Un administrador ocultó esta publicación.')
+    await avisarEnConversaciones(actualizado, null, () => 'Un administrador ocultó esta publicación.')
   }
 
   return serializar.regalo(actualizado, { esAdmin: true })
