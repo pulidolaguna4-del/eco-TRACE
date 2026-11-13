@@ -1,6 +1,6 @@
 # eco-TRACE · Especificación: Regalos (marketplace gratuito)
 
-**Estado:** borrador para revisión · **Rama:** `feat/marketplace-gratuito` · **Fecha:** 2026-11-12
+**Estado:** implementado, pendiente de validar con el instructor · **Rama:** `feat/marketplace-gratuito` · **Fecha:** 2026-11-13
 
 > Alcance ampliado: según el proyecto, las funciones nuevas se validan con el instructor antes de darlas por cerradas.
 
@@ -210,13 +210,13 @@ Todo con el estilo del rediseño: etiqueta superior verde, títulos `font-black`
 
 ---
 
-## 11. Avance de la implementación (2026-11-12)
+## 11. Avance de la implementación (2026-11-13)
 
-> Para retomar: `git switch feat/marketplace-gratuito && git pull`, luego `docker compose up -d --build`. Esto instala `socket.io` y aplica la migración `5_regalos`.
+> Para probarlo: `git switch feat/marketplace-gratuito && git pull`, luego `docker compose up -d --build`. Esto instala `socket.io` y `socket.io-client` y aplica la migración `5_regalos`.
 
-### ✅ Hecho (backend)
-La migración `5_regalos` ya está aplicada en Docker y pasan las pruebas básicas: `GET /regalos` → `[]`, `GET /conversaciones` sin sesión → 401, regalo inexistente → 404, y `/impacto` incluye `regalos`. **Falta probar el flujo completo con usuarios** (paso 1).
+**Estado:** backend y frontend completos (pasos 1 a 6 del plan). Falta la validación con el instructor y abrir el PR a `main`.
 
+### ✅ Backend
 | Archivo | Qué hace |
 |---|---|
 | `backend/prisma/schema.prisma` + `migrations/5_regalos` | Tablas `regalos`, `conversaciones`, `mensajes` y `reportes_regalo`, con borrado en cascada |
@@ -225,16 +225,32 @@ La migración `5_regalos` ya está aplicada en Docker y pasan las pruebas básic
 | `backend/src/tiempoReal.js` + `utils/emisor.js` | Socket.IO en el mismo puerto: JWT en el handshake, sala `usuario:<id>`, eventos `mensaje:enviar`, `mensajes:leidos`, `escribiendo`, `mensaje:nuevo`, `regalo:estado` y `no_leidos` |
 | `backend/src/server.js` | Servidor HTTP compartido con Socket.IO y vencimiento de regalos cada hora |
 | `backend/src/routes/regalos.routes.js`, `conversaciones.routes.js`, `admin.routes.js` | Endpoints de la sección 6, más `GET /conversaciones/no-leidos` y `POST /conversaciones/:id/mensajes` como alternativa REST |
-| `backend/src/middlewares/subirFoto.js` | Generalizado: `subirFoto` (entregas, 1 foto) y `subirFotosRegalo` (hasta 3, en `uploads/regalos`) |
+| `backend/src/middlewares/subirFoto.js` | `subirFoto` (entregas, 1 foto) y `subirFotosRegalo` (hasta 3, en `uploads/regalos`) |
 | `backend/src/services/impacto.service.js` | `GET /impacto` incluye `regalos: { kg_reutilizados, regalos_entregados, regalos_disponibles }` |
-| `backend/src/services/usuarios.service.js` | Al eliminar un usuario también se borran del disco las fotos de sus regalos |
 
-### ⏭️ Pendiente (en este orden)
-1. **Probar el backend en ejecución**: crear un regalo (multipart con `fotos`), listar, ver el detalle (revisar que no salgan las coordenadas exactas), "Me interesa", mensajes por REST y por socket, reservar, entregar, impacto y permisos (403 a quien no participa).
-2. **Frontend: instalar** `socket.io-client@4.8.1` en `frontend/`.
-3. **Contexto de chat** (`src/context/ChatContext.jsx`): conectar el socket con el token, el total de no leídos y escuchar eventos. Montarlo en `App.jsx`.
-4. **Páginas**: `/regalos` (listado, filtros y mapa con círculos), `/regalos/nuevo` (fotos con `comprimirFoto`, zona con Turf, aceptar las reglas), `/regalos/:id` (detalle, "Me interesa"; para el dueño: interesados, reservar, entregar, cancelar, renovar) y `/mensajes` (bandeja y chat).
-5. **Navbar**: enlace "Regalos" y, en el menú de usuario, "Mis regalos" y "Mensajes" con el contador de no leídos.
-6. **Panel admin**: sección "Regalos" en Moderación (reportes, ocultar, eliminar).
-7. **Impacto**: tarjetas de "kg reutilizados" y "regalos entregados".
-8. **Verificación completa** con dos cuentas, en modo oscuro y en el celular. Después, PR a `main`.
+**Correcciones encontradas al probarlo (2026-11-13):**
+- Los avisos automáticos ("A Beto le interesa", "Reservado para ti"…) se guardan a nombre de quien los causó. Antes contaban como no leídos para los dos y, como `leido_en` es uno solo, el primero que abría el chat se los marcaba como leídos al otro. Los avisos del administrador siguen sin remitente. Los avisos automáticos no se pueden reportar.
+- Socket.IO registraba los manejadores después de un `await`: un mensaje enviado justo al conectarse se perdía.
+
+### ✅ Frontend
+| Archivo | Qué hace |
+|---|---|
+| `src/context/ChatContext.jsx` | Una conexión de Socket.IO para toda la app (con el JWT; se reconecta al iniciar o cerrar sesión), total de no leídos, `suscribir`/`useEventoChat`, enviar y marcar leídos con respaldo por REST |
+| `src/utils/regalos.js` | Categorías, estados, objetos prohibidos, consejos de seguridad, límites y `api()` |
+| `src/components/regalos/` | Tarjeta, insignias, fotos, `MapaZonas` (círculos de 300 m), `SelectorZona` (Turf) y modales (reportar, editar, confirmar) |
+| `src/pages/Regalos.jsx` (`/regalos`) | Listado público con búsqueda sin tildes, filtro por categoría, vista de lista o mapa y estados vacíos |
+| `src/pages/RegaloNuevo.jsx` (`/regalos/nuevo`) | Hasta 3 fotos comprimidas (sin EXIF), categoría, cantidad, zona dentro de Ciudad Bolívar, barrio y confirmación de las reglas |
+| `src/pages/RegaloDetalle.jsx` (`/regalos/:id`) | Galería, zona, "Me interesa" y reporte. El dueño ve el punto exacto, los interesados y reserva, entrega, libera, cancela, renueva o edita. Se actualiza en vivo |
+| `src/pages/Mensajes.jsx` (`/mensajes`) | Bandeja y chat en tiempo real: escribiendo, ✓✓ de leído, avisos del sistema, mensajes anteriores, reporte de mensajes, solo lectura al cerrarse y reconexión. En el celular, una vista a la vez |
+| `src/pages/MisRegalos.jsx` (`/mis-regalos`) | Mis publicaciones con su estado, interesados y kg reutilizados |
+| `Navbar`, `Perfil`, `Home` | Enlace "Regalos"; "Mis regalos" y "Mensajes" con el contador de no leídos |
+| `src/components/admin/SeccionRegalos.jsx` | Moderación: reportes con el contexto limitado del mensaje, ocultar o mostrar, eliminar, revisar o descartar |
+| `src/pages/Impacto.jsx` | Tarjetas de kg reutilizados, regalos entregados y disponibles (separadas de los kg reciclados) |
+
+### ✅ Verificación (2026-11-13)
+- **API** (80 comprobaciones con 3 usuarios y un admin): publicar con validaciones, privacidad de la zona, filtros, "Me interesa" sin duplicar, mensajes por REST y socket, 403 a quien no participa, token falso rechazado, estados y sus errores 409, vencimiento y renovación, impacto, reportes, moderación, borrado de fotos y límite de 20 mensajes por minuto.
+- **Navegador** (Playwright, dos sesiones a la vez): el flujo completo publicar → explorar → "Me interesa" → chat en vivo (escribiendo y leídos) → reservar → entregar → chat cerrado → impacto; reporte de un mensaje y moderación del admin; celular en modo oscuro sin desplazamiento horizontal. Sin errores en la consola.
+
+### ⏭️ Pendiente
+1. Validar con el instructor los puntos de la sección 10.
+2. PR a `main`.

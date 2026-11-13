@@ -14,20 +14,23 @@ Es un proyecto formativo: el alcance ampliado se valida con el instructor. La do
 6. Los usuarios pueden **reportar** información incorrecta de un punto, y el administrador revisa esos reportes.
 7. Los usuarios **califican y reseñan** los puntos (1 a 5 estrellas, una reseña por usuario y punto, editable). Muchas reseñas negativas recientes marcan el punto para **revisión prioritaria**.
 8. El **dashboard de impacto** (`/impacto`) resume kg reciclados, entregas y puntos activos, con filtro por categoría y datos extra para el administrador.
+9. **Regalos** (marketplace gratuito, `/regalos`): los usuarios regalan lo que ya no usan, los interesados chatean en tiempo real con quien regala (Socket.IO) y este reserva y marca la entrega. Solo se publica una zona aproximada. Especificación: `docs/requisitos/Especificacion_Regalos.md`.
 
 Roles: `usuario` y `admin` (columna `es_admin`). Un cambio de rol solo se refleja en el JWT después de volver a iniciar sesión.
 
 ## Stack
 - **Frontend** (`frontend/`): React 19, Vite, Tailwind 4, React Router 7, Framer Motion, Leaflet / React-Leaflet, Turf.
-  - Páginas en `src/pages`: Home, Login, Register, RecuperarPassword, Mapa, Perfil, MisPuntos, Historial, Impacto, Admin. El modal de reseñas está en `src/components/ResenasPunto.jsx`.
+  - Páginas en `src/pages`: Home, Login, Register, RecuperarPassword, Mapa, Perfil, MisPuntos, Historial, Impacto, Admin, Regalos, RegaloNuevo, RegaloDetalle, MisRegalos y Mensajes. El modal de reseñas está en `src/components/ResenasPunto.jsx`.
+  - El chat usa una sola conexión de `socket.io-client` en `src/context/ChatContext.jsx` (no leídos y eventos para toda la app).
 - **Backend** (`backend/`): **Express 5 + Prisma 6 + Zod + argon2**, en JavaScript (ESM). Reemplazó al backend FastAPI/SQLModel (PR #42, 2026-11-05); el código Python solo queda en el historial de git.
   - Organizado por capas en `src/`: `routes/` → `controllers/` → `services/` (lógica y Prisma), más `middlewares/` (JWT, admin, validación, errores), `validators/` (Zod) y `utils/` (JWT, argon2, serializadores).
   - Los 27 endpoints heredados conservan las rutas y el formato de respuesta del backend FastAPI. Los errores responden `{ detail }`, y los de validación `422` con `detail: [{ loc, msg }]`, como Pydantic.
   - Endpoints de Tier 1: `PUT /admin/entregas/:id/revisar`, `GET /impacto` (público; `optionalAuth` añade el bloque `admin`), `GET|PUT|DELETE /puntos/:id/resenas` y `PUT /admin/puntos/:id/revision`.
-  - Migraciones: `0_init` (baseline del esquema de FastAPI), `1_ajustes_express`, `2_entregas_mer` (campos del MER en `entregas` y estados pendiente/verificada/rechazada, con relleno de datos antiguos) y `3_resenas`. `scripts/migrate.js` las aplica al arrancar el contenedor.
+  - Migraciones: `0_init` (baseline del esquema de FastAPI), `1_ajustes_express`, `2_entregas_mer` (campos del MER en `entregas` y estados pendiente/verificada/rechazada, con relleno de datos antiguos), `3_resenas`, `4_google_login` y `5_regalos`. `scripts/migrate.js` las aplica al arrancar el contenedor.
   - El promedio y el total de reseñas se guardan en `puntos` y se recalculan en `resenas.service.js#recalcular`. El umbral se configura con `UMBRAL_RESENAS_NEGATIVAS` (3) y `DIAS_RESENAS_RECIENTES` (30); solo cuentan las negativas posteriores a `fecha_revision`.
   - Las fechas se guardan en UTC y la API las devuelve en ISO 8601 con `Z`; el frontend las muestra en la hora local del navegador.
-- **Base de datos**: PostgreSQL 17. Tablas: `usuarios`, `puntos`, `categorias`, `punto_categoria` (un punto tiene varias categorías), `entregas`, `reportes`, `resenas` y `codigos_recuperacion`.
+- **Base de datos**: PostgreSQL 17. Tablas: `usuarios`, `puntos`, `categorias`, `punto_categoria` (un punto tiene varias categorías), `entregas`, `reportes`, `resenas`, `codigos_recuperacion`, `regalos`, `conversaciones`, `mensajes` y `reportes_regalo`.
+  - En `mensajes`, los avisos del sistema guardan como `remitente_id` a quien los causó, para que solo cuenten como no leídos para el otro participante.
 - **Infraestructura**: `docker compose up --build` levanta db (5432), backend (8000) y frontend (5173). Las variables van en `.env` en la raíz (ignorado por git): `POSTGRES_*`, `SECRET_KEY`, `EMAIL_*`.
 
 ## Planeación (docs/requisitos)
