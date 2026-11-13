@@ -539,6 +539,29 @@ function ComoFunciona() {
           </Link>
         </div>
       </Aparecer>
+
+      {/* REGALOS (MARKETPLACE GRATUITO) */}
+      <Aparecer className="mt-4">
+        <div className="rounded-3xl border border-dashed border-[#218739]/40 dark:border-[#2fa350]/40 bg-[#218739]/5 dark:bg-[#2fa350]/5 p-6 sm:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+          <div className="flex gap-4 items-start">
+            <span className="text-3xl" aria-hidden="true">🎁</span>
+            <div>
+              <h3 className="text-lg font-extrabold text-gray-900 dark:text-white">
+                ¿Tienes algo que ya no usas? Regálalo
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-[#a8b3ae] mt-1">
+                Madera, muebles, ropa, cartón… Publícalo gratis, conversa por chat con quien lo quiere y entrégalo en mano. Primero reutilizar, después reciclar.
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/regalos"
+            className="shrink-0 px-5 py-3 rounded-2xl bg-white dark:bg-[#1a2320] border border-[#218739]/30 text-[#218739] dark:text-[#2fa350] text-sm font-bold text-center hover:bg-[#218739] hover:text-white dark:hover:bg-[#2fa350] dark:hover:text-white transition-colors"
+          >
+            🎁 Ver regalos
+          </Link>
+        </div>
+      </Aparecer>
     </section>
   )
 }
@@ -738,6 +761,7 @@ function PiePagina({ sesionActiva }) {
           <p className="text-xs font-extrabold uppercase tracking-wider text-gray-900 dark:text-white mb-4">Explorar</p>
           <ul className="space-y-2.5">
             <li><Link to="/mapa" className={claseEnlace}>Mapa de puntos</Link></li>
+            <li><Link to="/regalos" className={claseEnlace}>Regalos</Link></li>
             <li><Link to="/impacto" className={claseEnlace}>Impacto</Link></li>
             <li><a href="#categorias" onClick={(e) => irASeccion(e, 'categorias')} className={claseEnlace}>Categorías</a></li>
             <li><a href="#como-funciona" onClick={(e) => irASeccion(e, 'como-funciona')} className={claseEnlace}>Cómo funciona</a></li>

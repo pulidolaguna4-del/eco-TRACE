@@ -632,6 +632,8 @@ function Perfil() {
           <div className="grid sm:grid-cols-2 gap-3">
             <Acceso to="/mis-puntos" icono="📍" titulo="Mis puntos" descripcion="Los puntos que propusiste y su estado" />
             <Acceso to="/historial" icono="♻️" titulo="Mis entregas" descripcion="Tu historial de entregas y donaciones" />
+            <Acceso to="/mis-regalos" icono="🎁" titulo="Mis regalos" descripcion="Lo que regalaste y quién lo pidió" />
+            <Acceso to="/mensajes" icono="💬" titulo="Mensajes" descripcion="Tus chats para acordar la entrega de los regalos" />
             <Acceso to="/mis-reportes" icono="🚩" titulo="Mis reportes" descripcion="Lo que reportaste y la respuesta del administrador" />
             <Acceso to="/mapa" icono="🗺️" titulo="Explorar el mapa" descripcion="Encuentra dónde reciclar o donar cerca de ti" />
             {usuario?.es_admin && (

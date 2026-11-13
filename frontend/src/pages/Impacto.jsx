@@ -309,6 +309,52 @@ function Impacto() {
           />
         </section>
 
+        {/* REUTILIZACIÓN (REGALOS): se cuenta aparte del reciclaje */}
+        {datos?.regalos && (
+          <section className="space-y-4" aria-labelledby="titulo-reutilizacion">
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+              <div>
+                <h2 id="titulo-reutilizacion" className="text-base font-extrabold text-gray-800 dark:text-[#f2f5f3]">
+                  🎁 Reutilización con Regalos
+                </h2>
+                <p className="text-xs text-gray-500 dark:text-[#a8b3ae] mt-1 max-w-2xl">
+                  Lo que los vecinos se regalaron en lugar de botarlo. Se cuenta aparte de los kilos reciclados
+                  {categoria ? ' y no cambia con el filtro de categoría.' : '.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/regalos')}
+                className="self-start sm:self-auto px-4 py-2 rounded-xl text-xs font-bold bg-white dark:bg-[#1a2320] text-[#176b2b] dark:text-[#2fa350] border border-gray-200 dark:border-gray-800/60 hover:border-[#218739]/40 cursor-pointer"
+              >
+                Ver regalos →
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+              <Tile
+                etiqueta="Kilos reutilizados"
+                icono="♻️"
+                valor={numero(datos.regalos.kg_reutilizados, 1)}
+                unidad="kg"
+                detalle="De los regalos entregados en kg"
+              />
+              <Tile
+                etiqueta="Regalos entregados"
+                icono="🤝"
+                valor={compacto(datos.regalos.regalos_entregados)}
+                detalle="Objetos que encontraron un nuevo dueño"
+              />
+              <Tile
+                etiqueta="Disponibles ahora"
+                icono="🎁"
+                valor={compacto(datos.regalos.regalos_disponibles)}
+                detalle="Publicados y esperando a alguien"
+              />
+            </div>
+          </section>
+        )}
+
         {/* APORTE POR CATEGORÍA */}
         <section className="bg-white dark:bg-[#1a2320] rounded-3xl border border-gray-100 dark:border-gray-800/40 shadow-xs p-6 sm:p-8">
           <div className="mb-6">

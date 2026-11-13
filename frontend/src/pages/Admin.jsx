@@ -22,6 +22,7 @@ import SeccionPuntos from '../components/admin/SeccionPuntos'
 import SeccionEntregas from '../components/admin/SeccionEntregas'
 import SeccionUsuarios from '../components/admin/SeccionUsuarios'
 import SeccionReportes from '../components/admin/SeccionReportes'
+import SeccionRegalos from '../components/admin/SeccionRegalos'
 
 const API_URL = 'http://127.0.0.1:8000'
 
@@ -35,7 +36,8 @@ const GRUPOS = [
     secciones: [
       { id: 'pendientes', texto: 'Puntos por aprobar', icono: '⏳' },
       { id: 'entregas', texto: 'Entregas', icono: '♻️' },
-      { id: 'reportes', texto: 'Reportes', icono: '🚩' }
+      { id: 'reportes', texto: 'Reportes', icono: '🚩' },
+      { id: 'regalos', texto: 'Regalos', icono: '🎁' }
     ]
   },
   {
@@ -52,6 +54,7 @@ const ENCABEZADOS = {
   pendientes: { grupo: 'Moderación', titulo: 'Puntos por aprobar', texto: 'Revisa cada propuesta antes de publicarla en el mapa. Quien la envió recibe un correo con tu decisión.' },
   entregas: { grupo: 'Moderación', titulo: 'Entregas', texto: 'Verifica las entregas y donaciones. Solo las verificadas suman al impacto.' },
   reportes: { grupo: 'Moderación', titulo: 'Reportes', texto: 'Avisos de la comunidad sobre información incorrecta de un punto.' },
+  regalos: { grupo: 'Moderación', titulo: 'Regalos', texto: 'Reportes sobre publicaciones y mensajes del marketplace gratuito. De los chats solo ves el mensaje reportado y los cercanos.' },
   puntos: { grupo: 'Gestión', titulo: 'Todos los puntos', texto: 'Consulta todos los puntos ecológicos y atiende los que están en revisión prioritaria.' },
   usuarios: { grupo: 'Gestión', titulo: 'Usuarios', texto: 'Administra las cuentas y los permisos de administrador.' }
 }
@@ -149,6 +152,7 @@ function Admin() {
   const [usuarios, setUsuarios] = useState([])
   const [entregas, setEntregas] = useState([])
   const [reportes, setReportes] = useState([])
+  const [reportesRegalos, setReportesRegalos] = useState([])
 
   // Sesión y carga
   const [esAdmin, setEsAdmin] = useState(false)
@@ -234,12 +238,13 @@ function Admin() {
     setError('')
 
     try {
-      const [pendientes, listaUsuarios, puntos, listaReportes, listaEntregas] = await Promise.all([
+      const [pendientes, listaUsuarios, puntos, listaReportes, listaEntregas, listaReportesRegalos] = await Promise.all([
         peticion('/admin/puntos/pendientes'),
         peticion('/admin/usuarios'),
         peticion('/admin/puntos'),
         peticion('/admin/reportes').catch((e) => ({ fallo: e })),
-        peticion('/admin/entregas').catch((e) => ({ fallo: e }))
+        peticion('/admin/entregas').catch((e) => ({ fallo: e })),
+        peticion('/admin/regalos/reportes').catch((e) => ({ fallo: e }))
       ])
 
       // Obligatorios: sin ellos el panel no sirve
@@ -277,6 +282,13 @@ function Admin() {
         avisos.push(formatearMensajeError(listaEntregas.datos?.detail, 'No se pudieron cargar las entregas.'))
       }
 
+      if (listaReportesRegalos.respuesta?.ok && Array.isArray(listaReportesRegalos.datos)) {
+        setReportesRegalos(listaReportesRegalos.datos)
+      } else {
+        setReportesRegalos([])
+        avisos.push(formatearMensajeError(listaReportesRegalos.datos?.detail, 'No se pudieron cargar los reportes de regalos.'))
+      }
+
       if (avisos.length) setError(avisos.join(' '))
       setUltimaActualizacion(new Date())
     } catch (err) {
@@ -287,6 +299,12 @@ function Admin() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Solo los reportes de regalos (después de moderar uno)
+  const cargarReportesRegalos = async () => {
+    const { respuesta, datos } = await peticion('/admin/regalos/reportes')
+    if (respuesta.ok && Array.isArray(datos)) setReportesRegalos(datos)
+  }
 
   // Verificar que la sesión sea de un administrador
   useEffect(() => {
@@ -566,11 +584,13 @@ function Admin() {
   const entregasPendientes = entregas.filter((e) => e.estado === 'pendiente').length
   const reportesPendientes = reportes.filter((r) => (r.estado || 'pendiente') === 'pendiente').length
   const prioritarios = todosLosPuntos.filter((p) => p.revision_prioritaria).length
+  const reportesRegalosPendientes = reportesRegalos.filter((r) => r.estado === 'pendiente').length
 
   const contadores = {
     pendientes: { valor: puntosPendientes.length, tono: 'amber', descripcion: 'por aprobar' },
     entregas: { valor: entregasPendientes, tono: 'amber', descripcion: 'por verificar' },
     reportes: { valor: reportesPendientes, tono: 'red', descripcion: 'abiertos' },
+    regalos: { valor: reportesRegalosPendientes, tono: 'red', descripcion: 'reportes abiertos' },
     puntos: { valor: prioritarios, tono: 'amber', descripcion: 'en revisión prioritaria' },
     usuarios: { valor: usuarios.length, tono: 'gris', descripcion: 'en total' }
   }
@@ -687,6 +707,17 @@ function Admin() {
                   reporteProcesandoId={reporteProcesandoId}
                   onRevisar={revisarReporte}
                   cargando={cargando}
+                />
+              )}
+
+              {seccion === 'regalos' && (
+                <SeccionRegalos
+                  reportes={reportesRegalos}
+                  cargando={cargando}
+                  peticion={peticion}
+                  onRecargar={cargarReportesRegalos}
+                  avisar={avisar}
+                  fallar={fallar}
                 />
               )}
 

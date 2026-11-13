@@ -1,6 +1,7 @@
 import { Routes, Route, useLocation } from 'react-router-dom'
 
 import Navbar from './components/Navbar'
+import { ChatProvider } from './context/ChatContext'
 
 import Autenticacion from './pages/Autenticacion'
 import RecuperarPassword from './pages/RecuperarPassword'
@@ -12,6 +13,11 @@ import MisPuntos from './pages/MisPuntos'
 import Historial from './pages/Historial'
 import MisReportes from './pages/MisReportes'
 import Impacto from './pages/Impacto'
+import Regalos from './pages/Regalos'
+import RegaloNuevo from './pages/RegaloNuevo'
+import RegaloDetalle from './pages/RegaloDetalle'
+import MisRegalos from './pages/MisRegalos'
+import Mensajes from './pages/Mensajes'
 
 function AppContent() {
   const location = useLocation()
@@ -87,6 +93,32 @@ function AppContent() {
           element={<Impacto />}
         />
 
+        {/* REGALOS (marketplace gratuito) Y SU CHAT */}
+        <Route
+          path="/regalos"
+          element={<Regalos />}
+        />
+
+        <Route
+          path="/regalos/nuevo"
+          element={<RegaloNuevo />}
+        />
+
+        <Route
+          path="/regalos/:id"
+          element={<RegaloDetalle />}
+        />
+
+        <Route
+          path="/mis-regalos"
+          element={<MisRegalos />}
+        />
+
+        <Route
+          path="/mensajes"
+          element={<Mensajes />}
+        />
+
         {/* ADMINISTRADOR */}
         <Route
           path="/admin"
@@ -98,8 +130,14 @@ function AppContent() {
   )
 }
 
+// El chat (Socket.IO) vive en un contexto para toda la aplicación:
+// así el contador de no leídos de la barra se actualiza en cualquier página
 function App() {
-  return <AppContent />
+  return (
+    <ChatProvider>
+      <AppContent />
+    </ChatProvider>
+  )
 }
 
 export default App

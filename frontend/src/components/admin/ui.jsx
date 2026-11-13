@@ -275,7 +275,7 @@ export function Avisos({ mensaje, error, onCerrarMensaje, onCerrarError }) {
 
 const SELECTOR_ENFOCABLE = 'button:not([disabled]), [href], textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
-function BaseModal({ idTitulo, procesando, onCancelar, children }) {
+export function BaseModal({ idTitulo, procesando, onCancelar, children, ancho = 'max-w-md' }) {
   const reducido = useReducedMotion()
   const refPanel = useRef(null)
 
@@ -330,7 +330,7 @@ function BaseModal({ idTitulo, procesando, onCancelar, children }) {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={reducido ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 16 }}
         transition={{ duration: 0.2 }}
-        className="w-full max-w-md bg-white dark:bg-[#1a2320] rounded-3xl shadow-2xl border border-gray-100 dark:border-gray-800/60 overflow-hidden"
+        className={`w-full ${ancho} max-h-[90vh] overflow-y-auto bg-white dark:bg-[#1a2320] rounded-3xl shadow-2xl border border-gray-100 dark:border-gray-800/60`}
         onClick={(e) => e.stopPropagation()}
       >
         {children}
@@ -339,7 +339,12 @@ function BaseModal({ idTitulo, procesando, onCancelar, children }) {
   )
 }
 
-function EncabezadoModal({ id, icono, titulo, subtitulo, onCerrar, procesando }) {
+const TONOS_ICONO = {
+  peligro: 'bg-red-50 dark:bg-red-950/40 border-red-100 dark:border-red-900/40',
+  primario: 'bg-[#f1f8f4] dark:bg-[#0f1512] border-[#218739]/15 dark:border-gray-800'
+}
+
+export function EncabezadoModal({ id, icono, titulo, subtitulo, onCerrar, procesando, tono = 'peligro' }) {
   return (
     <div className="relative px-6 pt-6 pb-5">
       <button
@@ -352,7 +357,7 @@ function EncabezadoModal({ id, icono, titulo, subtitulo, onCerrar, procesando })
         ✕
       </button>
       <div className="flex items-start gap-4 pr-10">
-        <span className="w-12 h-12 shrink-0 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-100 dark:border-red-900/40 flex items-center justify-center text-xl" aria-hidden="true">
+        <span className={`w-12 h-12 shrink-0 rounded-2xl border flex items-center justify-center text-xl ${TONOS_ICONO[tono] || TONOS_ICONO.peligro}`} aria-hidden="true">
           {icono}
         </span>
         <div>
@@ -364,7 +369,7 @@ function EncabezadoModal({ id, icono, titulo, subtitulo, onCerrar, procesando })
   )
 }
 
-function TarjetaElemento({ etiqueta, nombre, detalle }) {
+export function TarjetaElemento({ etiqueta, nombre, detalle }) {
   return (
     <div className="rounded-2xl bg-gray-50 dark:bg-[#0f1512] border border-gray-100 dark:border-gray-800/60 p-4">
       <p className="text-[11px] font-extrabold uppercase tracking-wider text-gray-500 dark:text-[#a8b3ae]">{etiqueta}</p>
@@ -390,6 +395,8 @@ export function ModalRechazo({
   subtitulo = 'Le enviaremos el motivo por correo a quien propuso el punto.',
   etiqueta = 'Punto seleccionado',
   textoConfirmar = 'Rechazar punto',
+  textoCargando = 'Rechazando...',
+  ayuda = 'Explica qué debe corregir el usuario.',
   placeholder = 'Ej.: la ubicación no coincide con la dirección indicada.'
 }) {
   const [motivo, setMotivo] = useState('')
@@ -435,7 +442,7 @@ export function ModalRechazo({
           />
           <div className="flex justify-between items-start gap-3 mt-1.5">
             <p id="ayuda-motivo" className={`text-xs ${errorMotivo ? 'text-red-700 dark:text-red-400 font-bold' : 'text-gray-500 dark:text-[#a8b3ae]'}`}>
-              {errorMotivo || 'Explica qué debe corregir el usuario.'}
+              {errorMotivo || ayuda}
             </p>
             <p className="text-xs font-bold text-gray-500 dark:text-[#a8b3ae] tabular-nums shrink-0" aria-hidden="true">{motivo.length}/{MOTIVO_MAX}</p>
           </div>
@@ -443,7 +450,7 @@ export function ModalRechazo({
 
         <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
           <BotonAccion onClick={onCancelar} deshabilitado={procesando}>Cancelar</BotonAccion>
-          <BotonAccion tipo="submit" variante="peligro" cargando={procesando} textoCargando="Rechazando...">
+          <BotonAccion tipo="submit" variante="peligro" cargando={procesando} textoCargando={textoCargando}>
             {textoConfirmar}
           </BotonAccion>
         </div>

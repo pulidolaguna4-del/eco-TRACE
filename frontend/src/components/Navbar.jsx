@@ -4,19 +4,24 @@
 // - Fija arriba. En el inicio es transparente sobre la foto del hero y
 //   se vuelve sólida al bajar; en las demás páginas siempre es sólida
 //   (y deja un espacio de su altura para no tapar el contenido).
-// - Enlaces principales: Inicio, Mapa, Impacto. Lo personal (perfil,
-//   mis puntos, mis entregas, administración) va en el menú de usuario.
+// - Enlaces principales: Inicio, Mapa, Regalos, Impacto. Lo personal
+//   (perfil, mis puntos, mis entregas, mis regalos, mensajes,
+//   administración) va en el menú de usuario.
+// - Los mensajes sin leer del chat de Regalos se muestran en el avatar
+//   y en "Mensajes" (llegan en tiempo real por ChatContext).
 // - En pantallas pequeñas, un botón abre el menú completo.
 
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 
+import { useChat } from '../context/ChatContext'
 import { useTheme } from '../context/ThemeContext'
 
 const ENLACES = [
   { to: '/home', texto: 'Inicio', icono: '🏠' },
   { to: '/mapa', texto: 'Mapa', icono: '🗺️' },
+  { to: '/regalos', texto: 'Regalos', icono: '🎁' },
   { to: '/impacto', texto: 'Impacto', icono: '📊' }
 ]
 
@@ -24,8 +29,20 @@ const ENLACES_USUARIO = [
   { to: '/perfil', texto: 'Mi perfil', icono: '👤' },
   { to: '/mis-puntos', texto: 'Mis puntos', icono: '📍' },
   { to: '/historial', texto: 'Mis entregas', icono: '♻️' },
+  { to: '/mis-regalos', texto: 'Mis regalos', icono: '🎁' },
+  { to: '/mensajes', texto: 'Mensajes', icono: '💬', conNoLeidos: true },
   { to: '/mis-reportes', texto: 'Mis reportes', icono: '🚩' }
 ]
+
+function ContadorNoLeidos({ total, className = '' }) {
+  if (!total) return null
+  return (
+    <span className={`min-w-5 h-5 px-1.5 rounded-full bg-red-600 text-white text-[11px] font-black flex items-center justify-center tabular-nums ${className}`}>
+      {total > 99 ? '99+' : total}
+      <span className="sr-only"> mensajes sin leer</span>
+    </span>
+  )
+}
 
 function leerUsuario() {
   try {
@@ -37,6 +54,7 @@ function leerUsuario() {
 
 function esRutaActiva(pathname, to) {
   if (to === '/home') return pathname === '/' || pathname === '/home'
+  if (to === '/regalos') return pathname === '/regalos' || pathname.startsWith('/regalos/')
   return pathname === to
 }
 
@@ -44,6 +62,7 @@ function Navbar() {
   const navigate = useNavigate()
   const location = useLocation()
   const { tema, alternarTema } = useTheme()
+  const { noLeidos } = useChat()
   const prefiereReducido = useReducedMotion()
 
   const usuario = leerUsuario()
@@ -220,6 +239,7 @@ function Navbar() {
                     )}
                   </span>
                   <span className="max-w-[8rem] truncate">{usuario?.nombre}</span>
+                  <ContadorNoLeidos total={noLeidos} />
                   <motion.span
                     animate={{ rotate: menuUsuario ? 180 : 0 }}
                     transition={{ duration: prefiereReducido ? 0 : 0.2 }}
@@ -263,7 +283,8 @@ function Navbar() {
                             }`}
                           >
                             <span aria-hidden="true">{enlace.icono}</span>
-                            {enlace.texto}
+                            <span className="flex-1">{enlace.texto}</span>
+                            {enlace.conNoLeidos && <ContadorNoLeidos total={noLeidos} />}
                           </Link>
                         ))}
 
@@ -321,8 +342,8 @@ function Navbar() {
               onClick={() => setMenuMovil((v) => !v)}
               aria-expanded={menuMovil}
               aria-controls="menu-movil"
-              aria-label={menuMovil ? 'Cerrar menú' : 'Abrir menú'}
-              className={`md:hidden w-10 h-10 rounded-xl flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+              aria-label={menuMovil ? 'Cerrar menú' : noLeidos ? `Abrir menú (${noLeidos} mensajes sin leer)` : 'Abrir menú'}
+              className={`relative md:hidden w-10 h-10 rounded-xl flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-colors ${
                 transparente
                   ? 'bg-white/15 border border-white/25'
                   : 'bg-gray-100 dark:bg-[#1a2320] border border-transparent dark:border-gray-800/40'
@@ -340,6 +361,9 @@ function Navbar() {
                   className={`block w-5 h-0.5 rounded-full ${transparente ? 'bg-white' : 'bg-gray-700 dark:bg-[#dce4e0]'}`}
                 />
               ))}
+              {sesionActiva && noLeidos > 0 && !menuMovil && (
+                <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-red-600 border-2 border-white dark:border-[#0f1512]" aria-hidden="true" />
+              )}
             </button>
           </div>
         </div>
@@ -395,7 +419,8 @@ function Navbar() {
                           }`}
                         >
                           <span aria-hidden="true">{enlace.icono}</span>
-                          {enlace.texto}
+                          <span className="flex-1">{enlace.texto}</span>
+                          {enlace.conNoLeidos && <ContadorNoLeidos total={noLeidos} />}
                         </Link>
                       ))}
 
