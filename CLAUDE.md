@@ -22,6 +22,7 @@ Roles: `usuario` y `admin` (columna `es_admin`). Un cambio de rol solo se reflej
 - **Frontend** (`frontend/`): React 19, Vite, Tailwind 4, React Router 7, Framer Motion, Leaflet / React-Leaflet, Turf.
   - Páginas en `src/pages`: Home, Login, Register, RecuperarPassword, Mapa, Perfil, MisPuntos, Historial, Impacto, Admin, Regalos, RegaloNuevo, RegaloDetalle, MisRegalos y Mensajes. El modal de reseñas está en `src/components/ResenasPunto.jsx`.
   - El chat usa una sola conexión de `socket.io-client` en `src/context/ChatContext.jsx` (no leídos y eventos para toda la app).
+  - Logo: la "e" que termina en un punto, en verde `#218739` (`#2fa350` en modo oscuro). Se usa con `src/components/Logo.jsx` (`<Logo />` completo y `<LogoSimbolo />`), que dibuja con `currentColor`. Los SVG maestros están en `public/logo/` y el favicon en `public/favicon.svg`. Las letras del logo están dibujadas a mano, no salen de una fuente.
 - **Backend** (`backend/`): **Express 5 + Prisma 6 + Zod + argon2**, en JavaScript (ESM). Reemplazó al backend FastAPI/SQLModel (PR #42, 2026-11-05); el código Python solo queda en el historial de git.
   - Organizado por capas en `src/`: `routes/` → `controllers/` → `services/` (lógica y Prisma), más `middlewares/` (JWT, admin, validación, errores), `validators/` (Zod) y `utils/` (JWT, argon2, serializadores).
   - Los 27 endpoints heredados conservan las rutas y el formato de respuesta del backend FastAPI. Los errores responden `{ detail }`, y los de validación `422` con `detail: [{ loc, msg }]`, como Pydantic.
